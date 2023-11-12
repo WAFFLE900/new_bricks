@@ -11,11 +11,19 @@ from time import time
 
 load_dotenv()
 
+'''
 db_username = os.environ.get('DB_USERNAME')
 db_password = os.environ.get('DB_PASSWORD')
 db_host = os.environ.get('DB_HOST')
 db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
+'''
+
+db_username = 'root'
+db_password = 'Yu0!newcode'
+db_host = '127.0.0.1'
+db_port = '3306'
+db_name = 'bricksdata'
 
 
 app = Flask(__name__)
@@ -239,7 +247,7 @@ def get_project():
     
     if post_data.get("project_status") == "normal":
         nor_query = """
-                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
+                    SELECT p.project_type, p.id, p.project_image,p.project_name,p.project_creation_date,p.project_edit_date,p.user_id
                     FROM project p
                     JOIN project_sort ps ON p.project_type = ps.project_type
                     WHERE p.user_id = {}
@@ -253,17 +261,20 @@ def get_project():
         data = [dict(zip(keys, row)) for row in SQL_data.fetchall()]
         conn.close()
         response_object["items"] = dict()
+        print(data)
         for row in data:
-            project_type = row.pop("project_type")
-            if project_type not in response_object["items"]:
+            project_type = row["project_type"]
+            if project_type not in response_object["items"].keys():
                 response_object["items"][project_type] = list()
+                response_object["items"][project_type].append(row)
+            else:
                 response_object["items"][project_type].append(row)
         found = True                     
         conn.close()
 
     if post_data.get("project_status") == "ended":
         end_query = """
-                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
+                    SELECT p.project_type, p.id, p.project_image,p.project_name,p.project_creation_date,p.project_edit_date,p.user_id
                     FROM project p
                     JOIN project_sort ps ON p.project_type = ps.project_type
                     WHERE p.user_id = {}
@@ -276,26 +287,29 @@ def get_project():
         keys = list(SQL_data.keys())
         data = [dict(zip(keys, row)) for row in SQL_data.fetchall()]
         found = True
+        print(data)
         response_object["items"] = dict()
         for row in data:
-            project_type = row.pop("project_type")
-            if project_type not in response_object["items"]:
+            project_type = row["project_type"]
+            if project_type not in response_object["items"].keys():
                 response_object["items"][project_type] = list()
+                response_object["items"][project_type].append(row)
+            else:
                 response_object["items"][project_type].append(row)
         conn.close()
 
 
     if post_data.get("project_status") == "trashcan":
         month_query = """
-                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
-                    FROM project
+                    SELECT p.project_type, p.id, p.project_image,p.project_name,p.project_creation_date,p.project_edit_date,p.user_id
+                    FROM project p
                     WHERE user_id = {} AND project_trashcan = 1
                         AND project_edit_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
                     ORDER BY project_edit_date DESC;
                 """.format(post_data.get("user_id"))
         not_month_query = """
-                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
-                    FROM project
+                    SELECT p.project_type, p.id, p.project_image,p.project_name,p.project_creation_date,p.project_edit_date,p.user_id
+                    FROM project p
                     WHERE user_id = {} AND project_trashcan = 1
                         AND project_edit_date < DATE_SUB(NOW(), INTERVAL 1 MONTH)
                     ORDER BY project_edit_date DESC;
@@ -312,16 +326,20 @@ def get_project():
         found = True
         response_object["month"] = dict()
         for row in month_data:
-            project_type = row.pop("project_type")
-            if project_type not in response_object["items"]:
-                response_object["items"][project_type] = list()
-                response_object["items"][project_type].append(row)
+            project_type = row["project_type"]
+            if project_type not in response_object["month"]:
+                response_object["month"][project_type] = list()
+                response_object["month"][project_type].append(row)
+            else:
+                response_object["month"][project_type].append(row)            
         response_object["not_in_month"] = dict()
         for row in not_month_data:
-            project_type = row.pop("project_type")
-            if project_type not in response_object["items"]:
-                response_object["items"][project_type] = list()
-                response_object["items"][project_type].append(row)
+            project_type = row["project_type"]
+            if project_type not in response_object["not_in_month"]:
+                response_object["not_in_month"][project_type] = list()
+                response_object["not_in_month"][project_type].append(row)
+            else:
+                response_object["not_in_month"][project_type].append(row)                
         conn.close()
         response_object["message"] = "垃圾桶"
     
