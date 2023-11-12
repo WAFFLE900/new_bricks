@@ -1,7 +1,3 @@
-import json
-import pymysql
-from turtle import pos
-from models import *
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, url_for
 from flask_cors import CORS
@@ -12,23 +8,14 @@ import logging
 import os
 from sqlalchemy import create_engine, text
 from time import time
-from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-'''
 db_username = os.environ.get('DB_USERNAME')
 db_password = os.environ.get('DB_PASSWORD')
 db_host = os.environ.get('DB_HOST')
 db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
-'''
-
-db_username = 'root'
-db_password = '123'
-db_host = '127.0.0.1'
-db_port = '3306'
-db_name = 'bricks_test'
 
 
 app = Flask(__name__)
@@ -36,13 +23,8 @@ CORS(app, resources={r"/*": {'origins': "*"}})
 app.config['SECRET_KEY'] = 'secret'
 
 #連線到伺服器上的 MySQL
-# {db_password}
 db_url = f"mysql+pymysql://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
-# db_url = f"mysql+pymysql://{db_username}:@{db_host}:{db_port}/{db_name}"
 engine = create_engine(db_url)
-
-Session=sessionmaker(bind=engine)
-session=Session()
 
 app.config.from_object(__name__)
 auth = HTTPTokenAuth(scheme='Bearer')
@@ -67,8 +49,13 @@ def verify_token(token):
         return False
     # return True
 
-    user=session.query(User).filter(User.user_email==data['user_email']).first()
-    if user is None:
+    selectUserEmail = f""""
+        SELECT user_email FROM users
+        WHERE user_email = "{data['user_email']}";
+    """
+    ret = conn.execute(text(selectUserEmail))
+    ret_list = ret.fetchall()
+    if ret_list is None:
         return False
     return data['user_email']
 
@@ -114,9 +101,14 @@ def login():
 
     #對比信箱，如正確回傳 user_id
     try:
-        user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        response_object['user_id'] = user.id
-        user_password = user.user_password
+        selectUserId = f"""
+            SELECT id, user_password FROM users
+            WHERE user_email = "{post_data.get("user_email")}";
+        """
+        result = conn.execute(text(selectUserId))
+        result_list = result.fetchall()
+        response_object['user_id'] = result_list[0][0]
+        user_password = result_list[0][1]
         if user_password != post_data.get("user_password"):
             response_object['status'] = "failure"
             response_object['message'] = "您的密碼不正確，請再試一次"
@@ -139,7 +131,7 @@ def login():
         },
         app.config['SECRET_KEY'],
         algorithm='HS256')
-    
+    result.close()
     conn.close()
     return token
 
@@ -163,33 +155,42 @@ def register():
         response_object['message'] = "有缺失信箱、密碼和使用者名稱回傳值"
         return jsonify(response_object)
     try:
-        user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        if user is not None:
+        isRegisted = f"""
+            SELECT IF(SUM(IF(user_email != "{post_data.get("user_email")}", 0, 1))>0, 1, 0) AS exist FROM users;
+        """
+        result = conn.execute(text(isRegisted))
+        result_list = result.fetchall()
+        if (result_list[0][0] == 0):
+            hashed_password = hash_password(post_data.get("user_password"))
+            addAccount = f"""
+            INSERT INTO users (user_email, user_password, user_name)
+            VALUES ("{post_data.get("user_email")}", "{hashed_password}"," {post_data.get("user_name")}");
+            """
+            print(hashed_password)
+            conn.execute(text(addAccount))
+            conn.execute(text("COMMIT;"))
+        else:
             response_object['status'] = "failure"
             response_object['message'] = "此信箱已被註冊過"
             return jsonify(response_object)
 
-        new_user=User(user_email=post_data.get('user_email'),user_password=post_data.get('user_password'),
-                      user_name=post_data.get('user_name'))
-        session.add(new_user)
-        response_object['user_id'] = new_user.id
+        selectUserId = f"""
+            SELECT id FROM users
+            WHERE user_email = "{post_data.get("user_email")}";
+        """
+        result2 = conn.execute(text(selectUserId))
+        result2_list = result2.fetchall()
+        response_object['user_id'] = result2_list[0][0]
+
     except:
         response_object['status'] = "failure"
-        response_object['message'] = "註冊失敗，請稍後再試"
+        response_object['message'] = "SELECT user_id 失敗 或 INSERT 失敗"
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        app.config['SECRET_KEY'],
-        algorithm='HS256')
-    
+    result.close()
+    result2.close()
     conn.close()
-    return token
+    return jsonify(response_object)
 
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
@@ -205,17 +206,20 @@ def register_survey():
         return jsonify(response_object)
     post_data = request.get_json()
     try:
-        user=session.query(User).filter(User.id==post_data.get('user_id')).first()
-        if user is None:
-            response_object['status']="failure"
-            response_object['message']="找不到帳號"
-            return jsonify(response_object)
-        user.user_purpose=",".join(post_data.get("user_purpose"))
-        user.user_identity=post_data.get("user_identity")
-        user.user_otherTool=",".join(post_data.get("user_otherTool"))
-        session.commit()
+        addInfo = f"""
+            UPDATE users
+            SET user_purpose = "{",".join(post_data.get("user_purpose"))}", user_identity = "{(post_data.get("user_identity"))}", user_otherTool = "{",".join(post_data.get("user_otherTool"))}" 
+            WHERE id = {(post_data.get("user_id"))};
+        """
+        conn.execute(text(addInfo))
+        conn.execute(text("COMMIT;"))
 
-        response_object['user_email'] = user.user_email
+        selectId = f"""
+            SELECT user_email FROM users
+            WHERE id = {(post_data.get("user_id"))};
+        """
+        result = conn.execute(text(selectId))
+        response_object['user_email'] = result.fetchall()[0][0]
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -234,56 +238,92 @@ def get_project():
     found = False
     
     if post_data.get("project_status") == "normal":
-        data=Project.query.join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==0,
-            Project.project_ended==0,
-            ProjectSort.user_id==post_data.get("user_id")
-        ).order_by(
-            ProjectSort.project_type_sort.asc(),
-            Project.project_edit_date.desc()
-        ).all()
+        nor_query = """
+                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
+                    FROM project p
+                    JOIN project_sort ps ON p.project_type = ps.project_type
+                    WHERE p.user_id = {}
+                    AND p.project_trashcan = 0
+                    AND p.project_ended = 0
+                    AND ps.user_id = {}
+                    ORDER BY ps.project_type_sort ASC, p.project_edit_date DESC;
+                """.format(post_data.get("user_id"), post_data.get("user_id"))
+        SQL_data = conn.execute(text(nor_query))
+        keys = list(SQL_data.keys())
+        data = [dict(zip(keys, row)) for row in SQL_data.fetchall()]
         conn.close()
-        found = True
-        response_object["items"] = data
+        response_object["items"] = dict()
+        for row in data:
+            project_type = row.pop("project_type")
+            if project_type not in response_object["items"]:
+                response_object["items"][project_type] = list()
+                response_object["items"][project_type].append(row)
+        found = True                     
+        conn.close()
 
     if post_data.get("project_status") == "ended":
-        data=Project.query.join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==0,
-            Project.project_ended==1,
-            ProjectSort.user_id==post_data.get("user_id")
-        ).order_by(
-            ProjectSort.project_type_sort.asc(),
-            Project.project_edit_date.desc()
-        ).all()
-        conn.close()
+        end_query = """
+                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
+                    FROM project p
+                    JOIN project_sort ps ON p.project_type = ps.project_type
+                    WHERE p.user_id = {}
+                    AND p.project_trashcan = 0
+                    AND p.project_ended = 1
+                    AND ps.user_id = {}
+                    ORDER BY ps.project_type_sort ASC, p.project_edit_date DESC;
+                """.format(post_data.get("user_id"), post_data.get("user_id"))
+        SQL_data = conn.execute(text(end_query))
+        keys = list(SQL_data.keys())
+        data = [dict(zip(keys, row)) for row in SQL_data.fetchall()]
         found = True
-        response_object["items"] = data
+        response_object["items"] = dict()
+        for row in data:
+            project_type = row.pop("project_type")
+            if project_type not in response_object["items"]:
+                response_object["items"][project_type] = list()
+                response_object["items"][project_type].append(row)
+        conn.close()
 
 
     if post_data.get("project_status") == "trashcan":
-        month_data=Project.query.filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==1,
-            Project.project_edit_date>=func.date_sub(func.now(),interval=1,unit='month')
-        ).order_by(
-            Project.project_edit_date.desc()
-        ).all()
+        month_query = """
+                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
+                    FROM project
+                    WHERE user_id = {} AND project_trashcan = 1
+                        AND project_edit_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+                    ORDER BY project_edit_date DESC;
+                """.format(post_data.get("user_id"))
+        not_month_query = """
+                    SELECT p.project_id, p.project_image,p.project_name,p.project_creation_date,p.edit_date,p.user_id
+                    FROM project
+                    WHERE user_id = {} AND project_trashcan = 1
+                        AND project_edit_date < DATE_SUB(NOW(), INTERVAL 1 MONTH)
+                    ORDER BY project_edit_date DESC;
+        """.format(post_data.get("user_id"))
 
-        not_month_data=Project.query.filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==1,
-            Project.project_edit_date<func.date_sub(func.now(),interval=1,unit='month')
-        ).order_by(
-            Project.project_edit_date.desc()
-        ).all()
+        month = conn.execute(text(month_query))
+        keys = list(month.keys())
+        month_data = [dict(zip(keys, row)) for row in month.fetchall()]
+
+        not_month = conn.execute(text(not_month_query))
+        keys = list(not_month.keys())
+        not_month_data = [dict(zip(keys, row)) for row in not_month.fetchall()]
 
         found = True
-        response_object["in_month"] = month_data
-        response_object["not_in_month"] = not_month_data
-        response_object["message"] = "垃圾桶"
+        response_object["month"] = dict()
+        for row in month_data:
+            project_type = row.pop("project_type")
+            if project_type not in response_object["items"]:
+                response_object["items"][project_type] = list()
+                response_object["items"][project_type].append(row)
+        response_object["not_in_month"] = dict()
+        for row in not_month_data:
+            project_type = row.pop("project_type")
+            if project_type not in response_object["items"]:
+                response_object["items"][project_type] = list()
+                response_object["items"][project_type].append(row)
         conn.close()
+        response_object["message"] = "垃圾桶"
     
     if found == False:
         response_object["status"] = "failed"
@@ -298,12 +338,11 @@ def set_end():
     try:
         conn = engine.connect()
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object['status']="failed"
-            response_object["message"]="找不到專案"
-        project.project_ended=1
-        session.commit()
+        set_query = """
+                        UPDATE project SET project_ended = 1 WHERE id = {};
+                    """.format(post_data.get("project_id"))
+        conn.execute(text(set_query))
+        conn.execute(text("COMMIT;"))
         conn.close()
         response_object["message"] = "修改成功"
 
@@ -321,13 +360,20 @@ def add_project():
         conn = engine.connect()
         post_data = request.get_json()
 
-        new_project=Project(project_type=post_data.get("project_type"), project_image=post_data.get("project_image"),
-                            project_name=post_data.get("project_name"), project_trashcan=post_data.get("project_trashcan"),
-                            project_ended=post_data.get("project_ended"), project_isEdit=post_data.get("project_isEdit"),
-                            project_isVisible=post_data.get("project_isVisible"), project_isCommit=post_data.get("project_isComment"),
-                            user_id=post_data.get("user_id"))
-        session.add(new_project)
-        session.commit()
+
+
+        Inquery = """
+            INSERT INTO project (project_type, project_image, project_name, project_trashcan, project_ended, project_edit, project_visible, project_comment, user_id)
+            VALUES 
+            ("{}", "{}", "{}", {}, {}, {}, {}, {}, {});
+        """.format(post_data.get("project_type"), post_data.get("project_image"), post_data.get("project_name"), post_data.get("project_trashcan"), post_data.get("project_ended"), 
+                post_data.get("project_isEdit"), post_data.get("project_isVisible"), post_data.get("project_isComment"), post_data.get("user_id"))
+
+
+        #執行SQL指令
+        conn.execute(text(Inquery))
+        conn.execute(text("COMMIT;"))
+        #關閉連線
         conn.close()
         response_object["message"] = "新增{}成功".format(post_data.get("project_name"))
 
@@ -345,23 +391,37 @@ def add_type():
         conn = engine.connect()
         post_data = request.get_json()
 
-        last=ProjectSort.query.with_entities(func.max(ProjectSort.project_type_sort)).filter(
-            ProjectSort.user_id==post_data.get("user_id"),
-            ProjectSort.project_ended==post_data.get("project_ended")
-        ).scalar()
+        get_last_query = """
+                    SELECT MAX(project_type_sort) AS max_sort FROM project_sort
+                    WHERE user_id = {} AND project_ended = {};
+        """.format(post_data.get("user_id"), post_data.get("project_ended"))
 
-        last_id=ProjectSort.query.with_entities(func.max(ProjectSort.type_id)).filter(
-            ProjectSort.user_id==post_data.get("user_id"),
-            ProjectSort.project_ended==post_data.get("project_ended")
-        ).scalar()
+        last = conn.execute(text(get_last_query))
+        keys = list(last.keys())
+        last = [dict(zip(keys, row)) for row in last.fetchall()]
 
-        sort = last + 1
-        id = last_id + 1
+        get_last_id_query = """
+                    SELECT MAX(type_id) AS max_sort FROM project_sort
+                    WHERE user_id = {} AND project_ended = {};
+        """.format(post_data.get("user_id"), post_data.get("project_ended"))
 
-        new_project_sort=ProjectSort(type_id=id,project_type=post_data.get("project_type"),project_type_sort=sort,
-                                     user_id=post_data.get("user_id"),project_ended=post_data.get("project_ended"))
-        db.session.add(new_project_sort)
-        db.session.commit()
+        last_id = conn.execute(text(get_last_id_query))
+        keys = list(last_id.keys())
+        last_id = [dict(zip(keys, row)) for row in last_id.fetchall()]
+
+        sort = last[0]["max_sort"] + 1
+        id = last_id[0]["max_sort"] + 1
+
+        Inquery = """
+            INSERT INTO project_sort (type_id, project_type, project_type_sort, user_id, project_ended)
+            VALUES 
+            ({}, "{}", {}, {}, {});
+        """.format(id, post_data.get("project_type"), sort, post_data.get("user_id"), post_data.get("project_ended"))
+
+        #執行SQL指令
+        conn.execute(text(Inquery))
+        conn.execute(text("COMMIT;"))
+        #關閉連線
         conn.close()
         response_object["message"] = "新增成功"
 
@@ -378,13 +438,11 @@ def set_type():
     try:
         conn = engine.connect()
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到專案"
-            return jsonify(response_object)
-        project.project_type=post_data.get("project_type")
-        session.commit()
+        set_query = """
+                        UPDATE project SET project_type = '{}' WHERE id = {};
+                    """.format(post_data.get("project_type"), post_data.get("project_id"))
+        conn.execute(text(set_query))
+        conn.execute(text("COMMIT;"))
         conn.close()
         response_object["message"] = "修改成功"
 
@@ -401,13 +459,12 @@ def recover():
     try:
         conn = engine.connect()
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到專案"
-            return jsonify(response_object)
-        project.project_trashcan=0
-        session.commit()
+        set_query = """
+                        UPDATE project SET project_trashcan = 0
+                        WHERE id = {};
+                    """.format(post_data.get("project_id"))
+        conn.execute(text(set_query))
+        conn.execute(text("COMMIT;"))
         conn.close()
         response_object["message"] = "修改成功"
 
@@ -428,16 +485,12 @@ def type_reindex():
         for item in post_data.get("type_sort"):
             id = item["id"]
             project_type_sort = item["project_type_sort"]
-            project_sort=session.query(ProjectSort).filter( ProjectSort.type_id==post_data.get("user_id"),
-                                                           ProjectSort.user_id==post_data.get("project_ended"),
-                                                           ProjectSort.project_ended==post_data.get("project_ended")).first()
-            if project_sort is None:
-                response_object["status"]="failed"
-                response_object["message"]="找不到專案類型"
-                return jsonify(response_object)
-            project_sort.project_type_sort=project_type_sort
+            requery = """
+            UPDATE project_sort SET project_type_sort = {} WHERE type_id = {} AND user_id = {} AND project_ended = {};
+            """.format(project_type_sort, id, post_data.get("user_id"), post_data.get("project_ended"))
+            conn.execute(text(requery))
             print("sort:{}, type_id:{}, user_id:{}".format(project_type_sort, id, post_data.get("user_id")))
-        session.commit()
+        conn.execute(text("COMMIT;"))
         conn.close()
         response_object["message"] = "修改成功"
 
@@ -454,13 +507,12 @@ def trashcan():
     try:
         conn = engine.connect()
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到專案"
-            return jsonify(response_object)
-        project.project_trashcan=1
-        session.commit()
+        set_query = """
+                        UPDATE project SET project_trashcan = 1
+                        WHERE id = {};
+                    """.format(post_data.get("project_id"))
+        conn.execute(text(set_query))
+        conn.execute(text("COMMIT;"))
         conn.close()
         response_object["message"] = "修改成功"
 
@@ -478,12 +530,13 @@ def personal_setting():
         response_object = {"status": "success"}
         post_data = request.get_json()
         
-        user=session.query(User).filter_by(id=post_data.get("user_id")).first()
-        if user is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到用戶"
-            return jsonify(response_object)
-        data=user.to_dict()
+        nor_query = """
+                        SELECT id, user_avatar, user_email, user_identity, user_name, user_otherTool, user_password, user_purpose
+                        FROM users WHERE id = {};
+                    """.format(post_data.get("user_id"))
+        SQL_data = conn.execute(text(nor_query))
+        keys = list(SQL_data.keys())
+        data = [dict(zip(keys, row)) for row in SQL_data.fetchall()]
         conn.close()
         response_object["items"] = data
     
@@ -503,11 +556,48 @@ def notification():
         response_object['status'] = "connect failure"
     user_id = request.get_json().get("user_id")
     try:
-        data=Notification.query.join(Mention,Notification.id==Mention.notification_id).filter(
-            Mention.notification_recipient_id==user_id).all()
+        notificationInfo = f"""SELECT id, notification_content, notification_id, notification_isRead, notification_recipient_id, notification_sender_id
+        FROM notification
+        JOIN mention
+        ON notification.id=mention.notification_id
+        WHERE mention.notification_recipient_id={user_id};"""
+
+        result = conn.execute(text(notificationInfo))
+        cols = list(result.keys())
+        data = [dict(zip(cols, row)) for row in result.fetchall()]
+
         response_object['items'] = data
     except:
         response_object['status'] = "algorithm failure"
+
+    result.close()
+    conn.close()
+    return jsonify(response_object)
+
+
+@app.route('/search_history', methods=['POST'])
+def search_history():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "connect failure"
+    user_id = request.get_json().get("user_id")
+    try:
+        historySort = f"""
+        SELECT id, user_id, search_content, search_time
+        FROM search_history
+        WHERE user_id={user_id}
+        ORDER BY search_time DESC
+        LIMIT 3;
+        """
+        result = conn.execute(text(historySort))
+        cols = list(result.keys())
+        data = [dict(zip(cols, row)) for row in result.fetchall()]
+        response_object['items'] = data
+    except:
+        response_object['status'] = "history fetch failure"
+    result.close()
     conn.close()
     return jsonify(response_object)
 
@@ -523,19 +613,56 @@ def search():
 
     global search_content
     search_content = request.get_json().get("search_content")
-    S_DATA = []
-
+    user_id = request.get_json().get("user_id")
     try:
-        data=Project.query.all()
+        isSame = f"""
+        SELECT COUNT(*) FROM search_history
+        WHERE user_id={user_id} AND search_content="{search_content}" """
+        result1 = conn.execute(text(isSame))
+        is_same = result1.fetchall()[0][0]
+
+        if is_same == 0:
+            nextID = f"""SELECT COUNT(*)+1 FROM search_history"""
+            result2 = conn.execute(text(nextID))
+            next_id = result2.fetchall()[0][0]
+            historyWrite = f"""
+            INSERT INTO search_history (id,user_id,search_content,search_time)
+            VALUES ({next_id},{user_id},"{search_content}",NOW())
+            """
+            result2.close()
+        else:
+            historyWrite = f"""
+            UPDATE search_history
+            SET search_time=NOW()
+            WHERE user_id={user_id} AND search_content="{search_content}";
+            """
+        conn.execute(text(historyWrite))
+        conn.execute(text("COMMIT;"))
+    except:
+        response_object['status'] = "history insert failure"
+
+    S_DATA = []
+    try:
+        searchResult = f"""SELECT * FROM project WHERE user_id={user_id};"""
+
+        result = conn.execute(text(searchResult))
+        cols = list(result.keys())
+        data = [dict(zip(cols, row)) for row in result.fetchall()]
+
         for project_info in data:
             if lcs(project_info) > 0:
                 S_DATA.append(project_info)
+
         S_DATA.sort(key=lcs, reverse=True)
+
         response_object['items'] = S_DATA
     except:
         response_object['status'] = "algorithm failure"
 
+    result.close()
+    result1.close()
     conn.close()
+
     return jsonify(response_object)
 
 
@@ -554,9 +681,7 @@ def lcs(data):
             else:
                 dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
 
-    return dp[str2_len][str1_len]
-
-
+    return dp[str2_len][str1_len]        
 
 
 if __name__ == "__main__":
