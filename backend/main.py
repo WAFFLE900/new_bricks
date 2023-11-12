@@ -19,11 +19,11 @@ db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
 '''
 
-db_username = 'root'
-db_password = 'Yu0!newcode'
+db_username = '資料庫的使用者名稱'
+db_password = '資料庫密碼'
 db_host = '127.0.0.1'
 db_port = '3306'
-db_name = 'bricksdata'
+db_name = 'bricksdata' #資料庫的名稱 可在schema看
 
 
 app = Flask(__name__)
