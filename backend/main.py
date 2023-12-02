@@ -5,6 +5,7 @@ from flask_httpauth import HTTPTokenAuth
 import hashlib
 import jwt
 import logging
+from models import *
 import os
 from sqlalchemy import create_engine, text, select
 from time import time
@@ -83,21 +84,6 @@ def verify_token(token):
     if ret_list is None:
         return False
     return data['user_email']
-
-DATA = [
-    {
-    'account':'RuCiCa',
-    'password': 'RuCiCa0307'
-    }
-]
-
-DATA = [
-    {
-    'account':'RuCiCa',
-    'password': 'RuCiCa0307'
-    }
-]
-
 
 # hello world route
 @app.route('/', methods=['GET'])
@@ -314,17 +300,17 @@ def get_project():
     elif post_data.get("project_status") == "trashcan":
         try:
             time_delta = datetime.now() - relativedelta(months=1)
-            in_month_SQL_data=session.query(Project, ProjectSort).filter(
-                Project.user_id==post_data.get("user_id"),
-                Project.project_trashcan==1,
+            in_month_SQL_data = session.query(Project).filter(
+                Project.user_id == post_data.get("user_id"),
+                Project.project_trashcan == 1,
                 Project.project_edit_date>=time_delta
             ).order_by(
                 Project.project_edit_date.desc()
             ).all()
 
-            not_in_month_SQL_data=session.query(Project, ProjectSort).filter(
-                Project.user_id==post_data.get("user_id"),
-                Project.project_trashcan==1,
+            not_in_month_SQL_data = session.query(Project).filter(
+                Project.user_id == post_data.get("user_id"),
+                Project.project_trashcan == 1,
                 Project.project_edit_date<time_delta
             ).order_by(
                 Project.project_edit_date.desc()
@@ -334,8 +320,9 @@ def get_project():
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
             return jsonify(response_object), 404
-        in_month_data = get_data(in_month_SQL_data)
-        not_in_month_data = get_data(not_in_month_SQL_data)
+        print(in_month_SQL_data)
+        in_month_data = row2dict(in_month_SQL_data)
+        not_in_month_data = row2dict(not_in_month_SQL_data)
         response_object["item"] = {
             "in_month":in_month_data,
             "not_int_month":not_in_month_data
