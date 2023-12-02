@@ -66,7 +66,7 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     project_type = db.Column(db.String(20), nullable=True)
     project_image = db.Column(db.String(20), nullable=True)
-    project_name = db.Column(db.String(20), nullable=False)
+    project_name = db.Column(db.String(100), nullable=False)
     project_trashcan = db.Column(db.Boolean, nullable=True)
     project_ended = db.Column(db.Boolean, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

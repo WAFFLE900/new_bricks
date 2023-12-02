@@ -10,9 +10,13 @@ import hashlib
 import jwt
 import logging
 import os
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, select
 from time import time
-from sqlalchemy.orm import sessionmaker
+# from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import *
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from fuzzywuzzy import fuzz
 
 load_dotenv()
 
@@ -24,12 +28,11 @@ db_port = os.environ.get('DB_PORT')
 db_name = os.environ.get('DB_NAME')
 '''
 
-db_username = 'root'
-db_password = '123'
-db_host = '127.0.0.1'
+db_username = 'bricks'
+db_password = 'NCCUgdsc1234!'
+db_host = '35.194.196.179'
 db_port = '3306'
-db_name = 'bricks_test'
-
+db_name = 'bricksdata_test'
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {'origins': "*"}})
@@ -39,13 +42,22 @@ app.config['SECRET_KEY'] = 'secret'
 # {db_password}
 db_url = f"mysql+pymysql://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
 # db_url = f"mysql+pymysql://{db_username}:@{db_host}:{db_port}/{db_name}"
-engine = create_engine(db_url)
-
+engine = create_engine(db_url, echo=True)
 Session=sessionmaker(bind=engine)
 session=Session()
 
 app.config.from_object(__name__)
 auth = HTTPTokenAuth(scheme='Bearer')
+
+#turn query into dict
+def row2dict(SQL_data):    
+    data = []
+    for row in SQL_data:
+        d = {}
+        for column in row.__table__.columns:
+            d[column.name] = str(getattr(row, column.name))
+        data.append(d)
+    return data
 
 #hash password
 def hash_password(password):
@@ -98,7 +110,7 @@ def bricks():
     return ("Bricks專案管理實用工具讚讚!")
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['POST'])
 def login():
     response_object = {'status': 'success'}
     response_object['message'] = "登入成功"
@@ -225,69 +237,93 @@ def register_survey():
     conn.close()
     return jsonify(response_object)
 
-
+# 以 project_type 為 dict 的 key 還未做，可以討論有沒有做的必要，因為已經有排序了
 @app.route('/project_index', methods=['POST'])
 def get_project():
-    conn = engine.connect()
     response_object = {"status": "success"}
     post_data = request.get_json()
-    found = False
-    
+    def get_data(sql):
+        data = {}
+        for project, project_sort in sql:
+            d = {}
+            for column in project.__table__.columns:
+                d[column.name] = str(getattr(project, column.name))
+            del d['project_type']
+            d['type_id'] = project_sort.type_id
+            if project.project_type not in data.keys():
+                data[project.project_type] = []
+            data[project.project_type].append(d)
+        return data
     if post_data.get("project_status") == "normal":
-        data=Project.query.join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==0,
-            Project.project_ended==0,
-            ProjectSort.user_id==post_data.get("user_id")
-        ).order_by(
-            ProjectSort.project_type_sort.asc(),
-            Project.project_edit_date.desc()
-        ).all()
-        conn.close()
-        found = True
+        try:
+            SQL_q = session.query(Project, ProjectSort).join(ProjectSort, Project.project_type==ProjectSort.project_type).filter(
+                Project.user_id==post_data.get("user_id"),
+                Project.project_trashcan==0,
+                Project.project_ended==0,
+                ProjectSort.user_id==post_data.get("user_id")
+            ).order_by(
+                ProjectSort.project_type_sort.asc(),
+                Project.project_edit_date.desc()
+            ).all()
+        except Exception as e:
+            response_object["status"] = "failed"
+            response_object["message"] = "SQL 搜尋失敗"
+            print(str(e))
+            return jsonify(response_object), 404 
+        data = get_data(SQL_q) 
         response_object["items"] = data
+        response_object["message"] = "正在進行專案"
 
-    if post_data.get("project_status") == "ended":
-        data=Project.query.join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==0,
-            Project.project_ended==1,
-            ProjectSort.user_id==post_data.get("user_id")
-        ).order_by(
-            ProjectSort.project_type_sort.asc(),
-            Project.project_edit_date.desc()
-        ).all()
-        conn.close()
-        found = True
+    elif post_data.get("project_status") == "ended":
+        try:
+            SQL_q=session.query(Project, ProjectSort).join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
+                Project.user_id==post_data.get("user_id"),
+                Project.project_trashcan==0,
+                Project.project_ended==1,
+                ProjectSort.user_id==post_data.get("user_id")
+            ).order_by(
+                ProjectSort.project_type_sort.asc(),
+                Project.project_edit_date.desc()
+            ).all()
+        except Exception as e:
+            response_object["status"] = "failed"
+            response_object["message"] = "SQL 搜尋失敗"
+            print(str(e))
+            return jsonify(response_object), 404
+        data = get_data(SQL_q)    
         response_object["items"] = data
+        response_object["message"] = "已結束專案"
 
+    elif post_data.get("project_status") == "trashcan":
+        try:
+            time_delta = datetime.now() - relativedelta(months=1)
+            in_month_SQL_data=session.query(Project, ProjectSort).filter(
+                Project.user_id==post_data.get("user_id"),
+                Project.project_trashcan==1,
+                Project.project_edit_date>=time_delta
+            ).order_by(
+                Project.project_edit_date.desc()
+            ).all()
 
-    if post_data.get("project_status") == "trashcan":
-        month_data=Project.query.filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==1,
-            Project.project_edit_date>=func.date_sub(func.now(),interval=1,unit='month')
-        ).order_by(
-            Project.project_edit_date.desc()
-        ).all()
-
-        not_month_data=Project.query.filter(
-            Project.user_id==post_data.get("user_id"),
-            Project.project_trashcan==1,
-            Project.project_edit_date<func.date_sub(func.now(),interval=1,unit='month')
-        ).order_by(
-            Project.project_edit_date.desc()
-        ).all()
-
-        found = True
-        response_object["in_month"] = month_data
-        response_object["not_in_month"] = not_month_data
+            not_in_month_SQL_data=session.query(Project, ProjectSort).filter(
+                Project.user_id==post_data.get("user_id"),
+                Project.project_trashcan==1,
+                Project.project_edit_date<time_delta
+            ).order_by(
+                Project.project_edit_date.desc()
+            ).all()
+        except Exception as e:
+            response_object["status"] = "failed"
+            response_object["message"] = "SQL 搜尋失敗"
+            print(str(e))
+            return jsonify(response_object), 404
+        in_month_data = get_data(in_month_SQL_data)
+        not_in_month_data = get_data(not_in_month_SQL_data)
+        response_object["item"] = {
+            "in_month":in_month_data,
+            "not_int_month":not_in_month_data
+        }
         response_object["message"] = "垃圾桶"
-        conn.close()
-    
-    if found == False:
-        response_object["status"] = "failed"
-        response_object["message"] = "沒找到"
 
     return jsonify(response_object)
 
@@ -296,45 +332,56 @@ def get_project():
 def set_end():
     response_object = {"status": "success"}
     try:
-        conn = engine.connect()
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object['status']="failed"
-            response_object["message"]="找不到專案"
-        project.project_ended=1
+        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":True})
         session.commit()
-        conn.close()
-        response_object["message"] = "修改成功"
-
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = str(e)
-
+        response_object["message"] = "SQL 搜尋失敗，找不到專案"
+        print(str(e))
+        return jsonify(response_object), 404
+    response_object["message"] = "修改成功"
     return jsonify(response_object)
 
+# 解除已結束專案狀態
+@app.route("/return_project_end", methods=["POST"])
+def return_end():
+    response_object = {"status": "success"}
+    try:
+        post_data = request.get_json()
+        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":False})
+        session.commit()
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "SQL 搜尋失敗，找不到專案"
+        print(str(e))
+        return jsonify(response_object), 404
+    response_object["message"] = "解除已結束專案狀態"
+    return jsonify(response_object)
 
 @app.route('/add_project', methods=['POST'])
 def add_project():
     response_object = {"status": "success"}
+    post_data = request.get_json()
     try:
-        conn = engine.connect()
-        post_data = request.get_json()
-
-        new_project=Project(project_type=post_data.get("project_type"), project_image=post_data.get("project_image"),
+        print(session.query(User).all())
+        new_project = Project(project_type=post_data.get("project_type"), project_image=post_data.get("project_image"),
                             project_name=post_data.get("project_name"), project_trashcan=post_data.get("project_trashcan"),
-                            project_ended=post_data.get("project_ended"), project_isEdit=post_data.get("project_isEdit"),
-                            project_isVisible=post_data.get("project_isVisible"), project_isCommit=post_data.get("project_isComment"),
+                            project_ended=post_data.get("project_ended"), project_edit=post_data.get("project_isEdit"),
+                            project_visible=post_data.get("project_isVisible"), project_comment=post_data.get("project_isComment"),
                             user_id=post_data.get("user_id"))
         session.add(new_project)
+        session.flush()
         session.commit()
-        conn.close()
-        response_object["message"] = "新增{}成功".format(post_data.get("project_name"))
-
+        print(new_project.id)
+        
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = str(e)
-
+        response_object["message"] = "新增失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object), 404
+    response_object["message"] = "新增{}成功".format(post_data.get("project_name"))
     return jsonify(response_object)
 
 
@@ -342,51 +389,57 @@ def add_project():
 def add_type():
     response_object = {"status": "success"}
     try:
-        conn = engine.connect()
         post_data = request.get_json()
 
-        last=ProjectSort.query.with_entities(func.max(ProjectSort.project_type_sort)).filter(
-            ProjectSort.user_id==post_data.get("user_id"),
-            ProjectSort.project_ended==post_data.get("project_ended")
-        ).scalar()
+        # last=session.query(Project).with_entities(func.max(ProjectSort.project_type_sort)).filter(
+        #     ProjectSort.user_id==post_data.get("user_id"),
+        #     ProjectSort.project_ended==post_data.get("project_ended")
+        # ).scalar()
 
-        last_id=ProjectSort.query.with_entities(func.max(ProjectSort.type_id)).filter(
-            ProjectSort.user_id==post_data.get("user_id"),
-            ProjectSort.project_ended==post_data.get("project_ended")
-        ).scalar()
+        # last_id=session.query(Project).with_entities(func.max(ProjectSort.type_id)).filter(
+        #     ProjectSort.user_id==post_data.get("user_id"),
+        #     ProjectSort.project_ended==post_data.get("project_ended")
+        # ).scalar()
 
-        sort = last + 1
-        id = last_id + 1
+        # sort = last + 1
+        # id = last_id + 1
 
-        new_project_sort=ProjectSort(type_id=id,project_type=post_data.get("project_type"),project_type_sort=sort,
-                                     user_id=post_data.get("user_id"),project_ended=post_data.get("project_ended"))
-        db.session.add(new_project_sort)
-        db.session.commit()
-        conn.close()
-        response_object["message"] = "新增成功"
+        # new_project_sort=ProjectSort(type_id=id,project_type=post_data.get("project_type"),project_type_sort=sort,
+        #                              user_id=post_data.get("user_id"),project_ended=post_data.get("project_ended"))
+        # session.add(new_project_sort)
+        
+        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_type":post_data.get("project_type")})
+        session.commit()
 
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = str(e)
-
+        response_object["message"] = "新增失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object), 404
+    response_object["message"] = "新增{}成功".format(post_data.get("project_type"))
     return jsonify(response_object)
-
 
 @app.route("/edit_type", methods=["POST"])
 def set_type():
     response_object = {"status": "success"}
     try:
-        conn = engine.connect()
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到專案"
+        # project=session.query(ProjectSort).filter(ProjectSort.type_id==post_data.get("type_id")).first()
+        project_count = session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).count()
+        if project_count == 0:
+            response_object["status"] = "failed"
+            response_object["message"] = "輸入類別名稱錯誤"
             return jsonify(response_object)
-        project.project_type=post_data.get("project_type")
+        session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).update({"project_type": post_data.get("project_type")})
+        # if project is None:
+        #     response_object["status"]="failed"
+        #     response_object["message"]="找不到類別"
+        #     return jsonify(response_object)
+        # old_type = project.project_type
+        # project.project_type=post_data.get("project_type")
         session.commit()
-        conn.close()
-        response_object["message"] = "修改成功"
+        response_object["message"] = f"{post_data.get('old_project_type')}成功修改成{post_data.get('project_type')}"
 
     except Exception as e:
         response_object["status"] = "failed"
@@ -399,7 +452,6 @@ def set_type():
 def recover():
     response_object = {"status": "success"}
     try:
-        conn = engine.connect()
         post_data = request.get_json()
         project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
         if project is None:
@@ -408,7 +460,6 @@ def recover():
             return jsonify(response_object)
         project.project_trashcan=0
         session.commit()
-        conn.close()
         response_object["message"] = "修改成功"
 
     except Exception as e:
@@ -417,12 +468,11 @@ def recover():
 
     return jsonify(response_object)
 
-
+# 沒有用了
 @app.route("/type_reindex", methods=["POST"])
 def type_reindex():
     response_object = {"status": "success"}
     try:
-        conn = engine.connect()
         post_data = request.get_json()
         
         for item in post_data.get("type_sort"):
@@ -438,7 +488,6 @@ def type_reindex():
             project_sort.project_type_sort=project_type_sort
             print("sort:{}, type_id:{}, user_id:{}".format(project_type_sort, id, post_data.get("user_id")))
         session.commit()
-        conn.close()
         response_object["message"] = "修改成功"
 
     except Exception as e:
@@ -452,7 +501,6 @@ def type_reindex():
 def trashcan():
     response_object = {"status": "success"}
     try:
-        conn = engine.connect()
         post_data = request.get_json()
         project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
         if project is None:
@@ -461,7 +509,6 @@ def trashcan():
             return jsonify(response_object)
         project.project_trashcan=1
         session.commit()
-        conn.close()
         response_object["message"] = "修改成功"
 
     except Exception as e:
@@ -470,7 +517,7 @@ def trashcan():
 
     return jsonify(response_object)
 
-
+# 還沒改
 @app.route("/personal_setting", methods=["POST"])
 def personal_setting():
     try:
@@ -493,7 +540,7 @@ def personal_setting():
 
     return jsonify(response_object)
 
-
+# 還沒改
 @app.route('/notification', methods=['POST'])
 def notification():
     response_object = {'status': 'success'}
@@ -514,47 +561,67 @@ def notification():
 
 @app.route('/search', methods=['POST'])
 def search():
-
     response_object = {'status': 'success'}
-    try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "connect failure"
-
-    global search_content
-    search_content = request.get_json().get("search_content")
-    S_DATA = []
+    post_data = request.get_json()
 
     try:
-        data=Project.query.all()
-        for project_info in data:
-            if lcs(project_info) > 0:
-                S_DATA.append(project_info)
-        S_DATA.sort(key=lcs, reverse=True)
-        response_object['items'] = S_DATA
-    except:
-        response_object['status'] = "algorithm failure"
+        rank_score = []
+        project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id")).all()
+        for project in project_list:
+            d = {}
+            for column in project.__table__.columns:
+                d[column.name] = str(getattr(project, column.name))
+            
 
-    conn.close()
-    return jsonify(response_object)
+            # 計算相似度（使用 fuzz.ratio 或 fuzz.token_sort_ratio）
+            score = fuzz.ratio(project.project_name, post_data.get("search_content"))
+            d['score'] = score
+            rank_score.append(d)
+            print(project.id, post_data.get("search_content"), project.project_name, fuzz.ratio(project.project_name, post_data.get("search_content")))
+        
+        sorted_rank = sorted(rank_score, key = lambda x:x.get('score'), reverse=True)
+        for i in sorted_rank:
+            print(i["project_name"])
+        
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        print(str(e))
+    
+    # global search_content
+    # search_content = request.get_json().get("search_content")
+    # S_DATA = []
+
+    # try:
+    #     data=Project.query.all()
+    #     for project_info in data:
+    #         if lcs(project_info) > 0:
+    #             S_DATA.append(project_info)
+    #     S_DATA.sort(key=lcs, reverse=True)
+    #     response_object['items'] = S_DATA
+    # except:
+    #     response_object['status'] = "algorithm failure"
+    
+    response_object['items'] = sorted_rank
+    return jsonify(response_object) 
 
 
-def lcs(data):
-    str1 = search_content
-    str2 = data['project_name']
-    str1_len = len(str1)
-    str2_len = len(str2)
+# def lcs(data):
+#     str1 = search_content
+#     str2 = data['project_name']
+#     str1_len = len(str1)
+#     str2_len = len(str2)
 
-    dp = [[0 for x in range(str1_len + 1)] for y in range(str2_len + 1)]
+#     dp = [[0 for x in range(str1_len + 1)] for y in range(str2_len + 1)]
 
-    for i in range(1, str2_len + 1):
-        for j in range(1, str1_len + 1):
-            if (str1[j - 1] == str2[i - 1]):
-                dp[i][j] = dp[i - 1][j - 1] + 1
-            else:
-                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+#     for i in range(1, str2_len + 1):
+#         for j in range(1, str1_len + 1):
+#             if (str1[j - 1] == str2[i - 1]):
+#                 dp[i][j] = dp[i - 1][j - 1] + 1
+#             else:
+#                 dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
 
-    return dp[str2_len][str1_len]
+#     return dp[str2_len][str1_len]
 
 
 
