@@ -1,7 +1,3 @@
-import json
-import pymysql
-from turtle import pos
-from models import *
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, url_for
 from flask_cors import CORS
@@ -39,7 +35,6 @@ CORS(app, resources={r"/*": {'origins': "*"}})
 app.config['SECRET_KEY'] = 'secret'
 
 #連線到伺服器上的 MySQL
-# {db_password}
 db_url = f"mysql+pymysql://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
 # db_url = f"mysql+pymysql://{db_username}:@{db_host}:{db_port}/{db_name}"
 engine = create_engine(db_url, echo=True)
@@ -79,8 +74,13 @@ def verify_token(token):
         return False
     # return True
 
-    user=session.query(User).filter(User.user_email==data['user_email']).first()
-    if user is None:
+    selectUserEmail = f""""
+        SELECT user_email FROM users
+        WHERE user_email = "{data['user_email']}";
+    """
+    ret = conn.execute(text(selectUserEmail))
+    ret_list = ret.fetchall()
+    if ret_list is None:
         return False
     return data['user_email']
 
@@ -126,9 +126,14 @@ def login():
 
     #對比信箱，如正確回傳 user_id
     try:
-        user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        response_object['user_id'] = user.id
-        user_password = user.user_password
+        selectUserId = f"""
+            SELECT id, user_password FROM users
+            WHERE user_email = "{post_data.get("user_email")}";
+        """
+        result = conn.execute(text(selectUserId))
+        result_list = result.fetchall()
+        response_object['user_id'] = result_list[0][0]
+        user_password = result_list[0][1]
         if user_password != post_data.get("user_password"):
             response_object['status'] = "failure"
             response_object['message'] = "您的密碼不正確，請再試一次"
@@ -151,7 +156,7 @@ def login():
         },
         app.config['SECRET_KEY'],
         algorithm='HS256')
-    
+    result.close()
     conn.close()
     return token
 
@@ -175,33 +180,42 @@ def register():
         response_object['message'] = "有缺失信箱、密碼和使用者名稱回傳值"
         return jsonify(response_object)
     try:
-        user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        if user is not None:
+        isRegisted = f"""
+            SELECT IF(SUM(IF(user_email != "{post_data.get("user_email")}", 0, 1))>0, 1, 0) AS exist FROM users;
+        """
+        result = conn.execute(text(isRegisted))
+        result_list = result.fetchall()
+        if (result_list[0][0] == 0):
+            hashed_password = hash_password(post_data.get("user_password"))
+            addAccount = f"""
+            INSERT INTO users (user_email, user_password, user_name)
+            VALUES ("{post_data.get("user_email")}", "{hashed_password}"," {post_data.get("user_name")}");
+            """
+            print(hashed_password)
+            conn.execute(text(addAccount))
+            conn.execute(text("COMMIT;"))
+        else:
             response_object['status'] = "failure"
             response_object['message'] = "此信箱已被註冊過"
             return jsonify(response_object)
 
-        new_user=User(user_email=post_data.get('user_email'),user_password=post_data.get('user_password'),
-                      user_name=post_data.get('user_name'))
-        session.add(new_user)
-        response_object['user_id'] = new_user.id
+        selectUserId = f"""
+            SELECT id FROM users
+            WHERE user_email = "{post_data.get("user_email")}";
+        """
+        result2 = conn.execute(text(selectUserId))
+        result2_list = result2.fetchall()
+        response_object['user_id'] = result2_list[0][0]
+
     except:
         response_object['status'] = "failure"
-        response_object['message'] = "註冊失敗，請稍後再試"
+        response_object['message'] = "SELECT user_id 失敗 或 INSERT 失敗"
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        app.config['SECRET_KEY'],
-        algorithm='HS256')
-    
+    result.close()
+    result2.close()
     conn.close()
-    return token
+    return jsonify(response_object)
 
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
@@ -217,17 +231,20 @@ def register_survey():
         return jsonify(response_object)
     post_data = request.get_json()
     try:
-        user=session.query(User).filter(User.id==post_data.get('user_id')).first()
-        if user is None:
-            response_object['status']="failure"
-            response_object['message']="找不到帳號"
-            return jsonify(response_object)
-        user.user_purpose=",".join(post_data.get("user_purpose"))
-        user.user_identity=post_data.get("user_identity")
-        user.user_otherTool=",".join(post_data.get("user_otherTool"))
-        session.commit()
+        addInfo = f"""
+            UPDATE users
+            SET user_purpose = "{",".join(post_data.get("user_purpose"))}", user_identity = "{(post_data.get("user_identity"))}", user_otherTool = "{",".join(post_data.get("user_otherTool"))}" 
+            WHERE id = {(post_data.get("user_id"))};
+        """
+        conn.execute(text(addInfo))
+        conn.execute(text("COMMIT;"))
 
-        response_object['user_email'] = user.user_email
+        selectId = f"""
+            SELECT user_email FROM users
+            WHERE id = {(post_data.get("user_id"))};
+        """
+        result = conn.execute(text(selectId))
+        response_object['user_email'] = result.fetchall()[0][0]
 
     except Exception as e:
         response_object['status'] = "failure"
@@ -478,14 +495,10 @@ def type_reindex():
         for item in post_data.get("type_sort"):
             id = item["id"]
             project_type_sort = item["project_type_sort"]
-            project_sort=session.query(ProjectSort).filter( ProjectSort.type_id==post_data.get("user_id"),
-                                                           ProjectSort.user_id==post_data.get("project_ended"),
-                                                           ProjectSort.project_ended==post_data.get("project_ended")).first()
-            if project_sort is None:
-                response_object["status"]="failed"
-                response_object["message"]="找不到專案類型"
-                return jsonify(response_object)
-            project_sort.project_type_sort=project_type_sort
+            requery = """
+            UPDATE project_sort SET project_type_sort = {} WHERE type_id = {} AND user_id = {} AND project_ended = {};
+            """.format(project_type_sort, id, post_data.get("user_id"), post_data.get("project_ended"))
+            conn.execute(text(requery))
             print("sort:{}, type_id:{}, user_id:{}".format(project_type_sort, id, post_data.get("user_id")))
         session.commit()
         response_object["message"] = "修改成功"
@@ -525,12 +538,13 @@ def personal_setting():
         response_object = {"status": "success"}
         post_data = request.get_json()
         
-        user=session.query(User).filter_by(id=post_data.get("user_id")).first()
-        if user is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到用戶"
-            return jsonify(response_object)
-        data=user.to_dict()
+        nor_query = """
+                        SELECT id, user_avatar, user_email, user_identity, user_name, user_otherTool, user_password, user_purpose
+                        FROM users WHERE id = {};
+                    """.format(post_data.get("user_id"))
+        SQL_data = conn.execute(text(nor_query))
+        keys = list(SQL_data.keys())
+        data = [dict(zip(keys, row)) for row in SQL_data.fetchall()]
         conn.close()
         response_object["items"] = data
     
@@ -550,11 +564,48 @@ def notification():
         response_object['status'] = "connect failure"
     user_id = request.get_json().get("user_id")
     try:
-        data=Notification.query.join(Mention,Notification.id==Mention.notification_id).filter(
-            Mention.notification_recipient_id==user_id).all()
+        notificationInfo = f"""SELECT id, notification_content, notification_id, notification_isRead, notification_recipient_id, notification_sender_id
+        FROM notification
+        JOIN mention
+        ON notification.id=mention.notification_id
+        WHERE mention.notification_recipient_id={user_id};"""
+
+        result = conn.execute(text(notificationInfo))
+        cols = list(result.keys())
+        data = [dict(zip(cols, row)) for row in result.fetchall()]
+
         response_object['items'] = data
     except:
         response_object['status'] = "algorithm failure"
+
+    result.close()
+    conn.close()
+    return jsonify(response_object)
+
+
+@app.route('/search_history', methods=['POST'])
+def search_history():
+    response_object = {'status': 'success'}
+    try:
+        conn = engine.connect()
+    except:
+        response_object['status'] = "connect failure"
+    user_id = request.get_json().get("user_id")
+    try:
+        historySort = f"""
+        SELECT id, user_id, search_content, search_time
+        FROM search_history
+        WHERE user_id={user_id}
+        ORDER BY search_time DESC
+        LIMIT 3;
+        """
+        result = conn.execute(text(historySort))
+        cols = list(result.keys())
+        data = [dict(zip(cols, row)) for row in result.fetchall()]
+        response_object['items'] = data
+    except:
+        response_object['status'] = "history fetch failure"
+    result.close()
     conn.close()
     return jsonify(response_object)
 
@@ -622,8 +673,6 @@ def search():
 #                 dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
 
 #     return dp[str2_len][str1_len]
-
-
 
 
 if __name__ == "__main__":
