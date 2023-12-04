@@ -233,15 +233,14 @@ def search():
         rank_score = []
         status = post_data.get("search_status")
         if status == "normal":
-            ended = False
-            trashcan = False
+            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_ended == False, Project.project_trashcan == False).all()
         elif status == "ended":
-            ended = True
-            trashcan = False
+            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_ended == True, Project.project_trashcan == False).all()
         elif status == "trashcan":
-            ended = True|False
-            trashcan = True
-        project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_ended == ended, Project.project_trashcan == trashcan).all()
+            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_trashcan == True).all()
+        elif status == "":
+            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id")).all()
+        
         for project in project_list:
             d = {}
             for column in project.__table__.columns:
