@@ -83,13 +83,6 @@ def bricks():
 def login():
     response_object = {'status': 'success'}
     response_object['message'] = "登入成功"
-    try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "failure"
-        response_object['message'] = "資料庫連線失敗"
-        return jsonify(response_object)
-
     #取得檔案
     post_data = request.get_json()
 
@@ -98,17 +91,20 @@ def login():
         user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
         response_object['user_id'] = user.id
         user_password = user.user_password
-        if user_password != post_data.get("user_password"):
+        hash_user_password = hash_password(post_data.get('user_password'))
+        print(user_password)
+        if user_password != hash_user_password:
             response_object['status'] = "failure"
-            response_object['message'] = "您的密碼不正確，請再試一次"
+            response_object['message'] = "您的帳號密碼不正確，請再試一次"
             return jsonify(response_object)
     except IndexError:
         response_object['status'] = "failure"
-        response_object['message'] = "您的帳號不正確，請再試一次"
+        response_object['message'] = "您的帳號帳號不正確，請再試一次"
         return jsonify(response_object)
-    except:
+    except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = "SELECT user_id 失敗"
+        print(str(e))
         return jsonify(response_object)
 
     token = jwt.encode(
@@ -121,7 +117,6 @@ def login():
         current_app.config['SECRET_KEY'],
         algorithm='HS256')
 
-    conn.close()
     return token
 
 
@@ -130,12 +125,6 @@ def login():
 def register():
     response_object = {'status': 'success'}
     response_object['message'] = "信箱註冊成功"
-    try:
-        conn = engine.connect()
-    except:
-        response_object['status'] = "failure"
-        response_object['message'] = "資料庫連線失敗"
-        return jsonify(response_object)
     post_data = request.get_json()
     if ((post_data.get("user_email") == None) |
         (post_data.get("user_password") == None) |
@@ -149,28 +138,31 @@ def register():
             response_object['status'] = "failure"
             response_object['message'] = "此信箱已被註冊過"
             return jsonify(response_object)
-
-        new_user=User(user_email=post_data.get('user_email'),user_password=post_data.get('user_password'),
+        print(post_data.get('user_password'))
+        hash_user_password = hash_password(post_data.get('user_password'))
+        print(hash_user_password)
+        new_user=User(user_email=post_data.get('user_email'),user_password=hash_user_password,
                       user_name=post_data.get('user_name'))
         session.add(new_user)
+        session.commit()
         response_object['user_id'] = new_user.id
-    except:
+    except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = "註冊失敗，請稍後再試"
+        print(str(e))
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        app.config['SECRET_KEY'],
-        algorithm='HS256')
+    # token = jwt.encode(
+    #     {
+    #         'user_email': post_data.get("user_email"),
+    #         'exp': int(time() + 60 * 60 * 24 * 30),
+    #         'status': "success",
+    #         'message': "登入成功"
+    #     },
+    #     app.config['SECRET_KEY'],
+    #     algorithm='HS256')
 
-    conn.close()
-    return token
+    return jsonify(response_object)
 
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
