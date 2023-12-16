@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, text
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
+from authlib.integrations.flask_client import OAuth
 
 load_dotenv()
 
@@ -39,34 +40,79 @@ engine = create_engine(db_url, echo=True)
 Session=sessionmaker(bind=engine)
 session=Session()
 
+# Google OAuth configs
+oauth = OAuth(app)
+oauth.init_app(app)
+google_oauth = oauth.register(
+    name='google', # name of this method
+    client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
+    client_secret='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',
+    access_token_url='https://www.googleapis.com/oauth2/v4/token',
+    access_token_params=None,
+    authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
+    authorize_params=None,
+    api_base_url='https://accounts.googleapis.com/oauth2/v3',
+    client_kwargs={'scope': 'openid profile email'},
+    server_metadata_url= 'https://accounts.google.com/.well-known/openid-configuration',
+    jwk_uri='https://www.googleapis.com/oauth2/v3/certs'
+)
 
+
+# Flask authentication configs
 app.config.from_object(__name__)
 auth = HTTPTokenAuth(scheme='Bearer')
 
-#hash password
-def hash_password(password):
-    sha256 = hashlib.sha256()
-    sha256.update(password.encode('utf-8'))
-    hashed_password = sha256.hexdigest()
-    return hashed_password
-
-auth = HTTPTokenAuth(scheme='Bearer')
-
-#verify token
 @auth.verify_token
 def verify_token(token):
-    conn = engine.connect()
-    print(jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256']))
+    '''decode the JWT and verify the user identity'''
     try:
         data = jwt.decode(token,
                           app.config['SECRET_KEY'],
                           algorithms=['HS256'])
     except:
         return False
-    user=session.query(User).filter(User.user_email==data['user_email']).first()
+
+    if time() > data['exp']:
+        # the JWT is expired
+        return False
+    
+    user = session.query(User).filter(User.user_email==data['user_email']).first()
     if user is None:
         return False
-    return data['user_email']
+    return user
+
+@auth.error_handler
+def auth_error(status):
+    response_object = {
+        "message":"Access Denied",
+        "status":"failure"
+    }
+    if status == 403:
+        response_object['message'] = "Permission Denied"
+    return jsonify(response_object), status
+
+
+
+# Utility functions
+def hash_password(password):
+    '''The function hashes the input password'''
+    sha256 = hashlib.sha256()
+    sha256.update(password.encode('utf-8'))
+    hashed_password = sha256.hexdigest()
+    return hashed_password
+
+def make_JWT(user_email):
+    '''The function create the JWT for a login user'''
+    token = jwt.encode(
+        {
+            'user_email': user_email,
+            'exp': int(time() + 60 * 60 * 24 * 30)
+        },
+        app.config['SECRET_KEY'],
+        algorithm='HS256')
+    return token
+
+
 
 # hello world route
 @app.route('/', methods=['GET'])
@@ -79,32 +125,66 @@ def bricks():
     return ("Bricks專案管理實用工具讚讚!")
 
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/google_login', methods=['POST'])
+def google_login():
+    '''The backend URL for user to login with Google'''
+    try:
+        token = google_oauth.authorize_access_token()
+    except:
+        response_object = {
+            'status':'failure',
+            'message':"Google登入失敗"
+        }
+        return jsonify(response_object)
+    
+    # succeed to login with Google, then check the database for the login user
+    user_info = token['userinfo']
+    try:
+        user = session.query(User).filter(User.user_email==user_info['email']).first()
+        if user is None:
+            # The user does NOT exist in the database, then register a new account
+            user = User(user_email = user_info['email'],
+                        user_name = user_info['name'])
+            session.add(user)
+            session.commit()
+    except:
+        response_object = {
+            'status':'failure',
+            'message':"資料庫錯誤"
+        }
+        return jsonify(response_object)
+    
+    # email and password are verified
+    response_object = {'status': "success",
+                        'message': "登入成功"}
+    response = jsonify(response_object)
+    token = make_JWT(user.user_email) # issue a JWT token as authorization
+    response.headers['Authorization'] = f"Bearer {token}"
+    print(f"JWT : {response.headers['Authorization']}")
+    return response
+
+
+@app.route('/bricks_login', methods=['POST'])
+def bricks_login():
     response_object = {'status': 'success'}
     response_object['message'] = "登入成功"
-    #取得檔案
     post_data = request.get_json()
-
-    #對比信箱，如正確回傳 user_id
     try:
         user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
         response_object['user_id'] = user.id
         user_password = user.user_password
-        hash_user_password = hash_password(post_data.get('user_password'))
-        print(user_password)
+        hash_user_password = hash_password(post_data.get("user_password"))
         if user_password != hash_user_password:
             response_object['status'] = "failure"
-            response_object['message'] = "您的帳號密碼不正確，請再試一次"
+            response_object['message'] = "您的密碼不正確，請再試一次"
             return jsonify(response_object)
     except IndexError:
         response_object['status'] = "failure"
-        response_object['message'] = "您的帳號帳號不正確，請再試一次"
+        response_object['message'] = "您的帳號不正確，請再試一次"
         return jsonify(response_object)
-    except Exception as e:
+    except:
         response_object['status'] = "failure"
         response_object['message'] = "SELECT user_id 失敗"
-        print(str(e))
         return jsonify(response_object)
 
     token = jwt.encode(
@@ -138,31 +218,27 @@ def register():
             response_object['status'] = "failure"
             response_object['message'] = "此信箱已被註冊過"
             return jsonify(response_object)
-        print(post_data.get('user_password'))
-        hash_user_password = hash_password(post_data.get('user_password'))
-        print(hash_user_password)
+        hash_user_password = hash_password(post_data.get("user_password"))
         new_user=User(user_email=post_data.get('user_email'),user_password=hash_user_password,
                       user_name=post_data.get('user_name'))
         session.add(new_user)
-        session.commit()
         response_object['user_id'] = new_user.id
-    except Exception as e:
+    except:
         response_object['status'] = "failure"
         response_object['message'] = "註冊失敗，請稍後再試"
-        print(str(e))
         return jsonify(response_object)
 
-    # token = jwt.encode(
-    #     {
-    #         'user_email': post_data.get("user_email"),
-    #         'exp': int(time() + 60 * 60 * 24 * 30),
-    #         'status': "success",
-    #         'message': "登入成功"
-    #     },
-    #     app.config['SECRET_KEY'],
-    #     algorithm='HS256')
+    token = jwt.encode(
+        {
+            'user_email': post_data.get("user_email"),
+            'exp': int(time() + 60 * 60 * 24 * 30),
+            'status': "success",
+            'message': "登入成功"
+        },
+        app.config['SECRET_KEY'],
+        algorithm='HS256')
 
-    return jsonify(response_object)
+    return token
 
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
