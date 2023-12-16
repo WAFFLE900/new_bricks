@@ -1,3 +1,4 @@
+from queue import Empty
 from dotenv import load_dotenv
 from flask import Flask, current_app
 from flask_cors import CORS
@@ -9,7 +10,7 @@ import jwt
 import logging
 from flask import Flask, jsonify, request, current_app
 from time import time
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, desc, and_, or_, exists, func
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
@@ -123,6 +124,17 @@ def greetings():
 @app.route('/bricks', methods=['GET'])
 def bricks():
     return ("Bricks專案管理實用工具讚讚!")
+
+@app.route('/oauth_test')
+@auth.login_required(optional=True)
+def index():
+    '''The home page'''
+    user = auth.current_user()
+    if user:
+        return jsonify({"text":"歡迎使用Bricks專案管理實用工具",
+                        "user":user.user_email})
+    else:
+        return jsonify({"text":"歡迎使用Bricks專案管理實用工具，請先登入"})
 
 
 @app.route('/google_login', methods=['POST'])
@@ -537,7 +549,248 @@ def search():
     return jsonify(response_object) 
 
 
+# 回傳所有標籤
+@app.route('/tag_index', methods=['GET'])
+@auth.login_required()
+def tag_index():
+    response_object = {'status': 'success'}
+    user = auth.current_user()
+    try:
+        id = request.args.get('id')
+        result = (
+            session.query(Tag.tag_class, func.group_concat(func.DISTINCT(Tag.tag_name)).label('tag_names'))
+            .select_from(Project)
+            .join(Record, Project.id == Record.project_id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .join(Tag, TagTextBox.tag_id == Tag.id)
+            .filter(Project.id == id, User.user_email == user.user_email)
+            .group_by(Tag.tag_class)
+            .distinct()
+            .all()
+        )
+        print("result: ", result)
+        sorted_tags = [{'tag_class': row.tag_class, 'tag_names': sorted(row.tag_names.split(','))} for row in result]
+        response_object["item"] = sorted_tags
+        response_object["message"] = "標籤回傳成功"
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "標籤回傳失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object)
+    return jsonify(response_object)
 
+# 標籤搜尋
+@app.route('/tag_search', methods=['POST'])
+@auth.login_required()
+def tag_search():
+    response_object = {'status': 'success'}
+    try:
+        post_data = request.get_json()
+        id = request.get_json().get("id") # project_id
+        user = auth.current_user()
+        print("project_id: ", id)
+        print("user_email: ", user.user_email)
+
+        date_projects = (
+            session.query(TextBox.id, TextBox.record_id, TextBox.textBox_content, func.count(Tag.id).label('tag_count'))
+            .select_from(User)
+            .join(Project, User.id == Project.user_id)
+            .join(Record, Project.id == Record.project_id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .join(Tag, TagTextBox.tag_id == Tag.id)
+            .filter(Project.id == id, User.user_email == user.user_email)
+            .filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
+            .group_by(TextBox.id)
+            .order_by(desc('tag_count'))
+            .all()
+        )
+        print("date_project: ", date_projects)
+
+        undate_projects = (
+            session.query(TextBox.id, TextBox.record_id, TextBox.textBox_content, func.count(Tag.id).label('tag_count'))
+            .select_from(User)
+            .join(Project, User.id == Project.user_id)
+            .join(Record, Project.id == Record.project_id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .join(Tag, TagTextBox.tag_id == Tag.id)
+            .filter(Project.id == id)
+            .filter(
+                ~exists()
+                .where(and_(
+                        Tag.tag_class == '日期',
+                        Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]),
+                        TagTextBox.textBox_id == TextBox.id
+                ))
+                .correlate_except(TextBox)
+            )
+            .group_by(TextBox.id)
+            .order_by(desc('tag_count'))
+            .all()
+        )
+        print(undate_projects)
+        response_object["item"] = {"match": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in date_projects],
+                                   "unmatch": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in undate_projects]
+                                   }
+        response_object["message"] = "標籤回傳成功"
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "標籤回傳失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object)
+    return jsonify(response_object)
+
+# 新增標籤
+@app.route('/add_tag', methods=['POST'])
+@auth.login_required()
+def add_tag():
+    response_object = {"status": "success"}
+    try:
+        post_data = request.get_json()
+        textBox_id = post_data.get("id")
+        user = auth.current_user()
+        print("user_email: ", user.user_email)
+        project_id = (
+            session.query(Project.id)
+            .select_from(User)
+            .join(Project, User.id == Project.user_id)
+            .join(Record, Project.id == Record.project_id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .filter(TextBox.id == textBox_id)
+            .filter(User.user_email == user.user_email)
+            .scalar()
+        )
+        tag = (
+            session.query(Tag)
+            .select_from(Project)
+            .join(Record, Project.id == Record.project_id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .join(Tag, TagTextBox.tag_id == Tag.id)
+            .filter(Project.id == project_id)
+            .filter(Tag.tag_name == post_data.get("tag_name"))
+            .first()
+        )
+        if tag is None:
+            print("tag is none")
+            new_tag=Tag(tag_name=post_data.get("tag_name"), tag_class=post_data.get("tag_class"))
+            session.add(new_tag)
+            session.flush()
+            session.commit()
+            print("tag_name: ", post_data.get("tag_name"))
+            new_tagId = (
+                session.query(Tag.id)
+                .filter(Tag.tag_name == post_data.get("tag_name"))
+                .first()
+            )
+            print("new_tagId: ", new_tagId[0])
+            new_tagTextBox=TagTextBox(tag_id=new_tagId[0], textBox_id=post_data.get("id"))
+            session.add(new_tagTextBox)
+            session.flush()
+            session.commit()
+            response_object["message"] = "新增{}成功".format(post_data.get("tag_name"))
+        else:
+            response_object["message"] = "標籤已存在"
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "新增失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object)
+    return jsonify(response_object)
+
+# 刪除標籤
+@app.route('/delete_tag', methods=['POST'])
+def delete_tag():
+    response_object = {'status': 'success'}
+    try:
+        post_data = request.get_json()
+        dTag = session.query(Tag).filter(Tag.id==post_data.get("id")).first()
+        print(dTag)
+        if dTag is None:
+            response_object["message"] = "標籤不存在"
+        else:
+            session.query(TagTextBox).filter(TagTextBox.tag_id == post_data.get("id")).delete()
+            session.flush()
+            session.query(Tag).filter(Tag.id==post_data.get("id")).delete()
+            session.flush()
+            session.commit()
+            response_object["message"] = "刪除標籤{}成功".format(post_data.get("id"))
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "標籤尋找失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object)
+    return jsonify(response_object)
+
+# 刪除文字方塊
+@app.route('/delete_textBox', methods=['POST'])
+def delete_texBox():
+    response_object = {'status': 'success'}
+    try:
+        post_data = request.get_json()
+        tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("id")).all()
+        if tag_textboxs is Empty:
+            response_object["message"] = "此文字方塊無標籤"
+        else:
+            tag_ids = [record.tag_id for record in tag_textboxs]
+            # 提取 Tag 物件的 id 值
+            tag_ids_to_delete = [tag.id for tag in session.query(Tag).filter(Tag.id.in_(tag_ids)).all()]
+            # 查詢每個 tag_id 在 TagTextBox 中的引用次數
+            tag_id_counts = (
+                session.query(TagTextBox.tag_id, func.count())
+                .filter(TagTextBox.tag_id.in_(tag_ids_to_delete))
+                .group_by(TagTextBox.tag_id)
+                .all()
+            )
+            print(tag_id_counts)
+            for tag_id, count in tag_id_counts:
+                session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id).delete()
+                session.flush()
+                # 如果標籤只在要刪除的文字方塊中，刪除標籤
+                if count == 1:
+                    session.query(Tag).filter(Tag.id == tag_id).delete()
+                    session.flush()
+        session.query(TextBox).filter(TextBox.id == post_data.get("id")).delete()
+        session.flush()
+        session.commit()
+        response_object["message"] = "刪除文字方框{}成功".format(post_data.get("id"))
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "文字方塊刪除失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object)
+    return jsonify(response_object)
+
+# 顯示垃圾桶中會議記錄
+@app.route('/trashcan_record', methods=['GET'])
+@auth.login_required(optional=True)
+def trashcan_record():
+    response_object = {'status': 'success'}
+    try:
+        user = auth.current_user()
+        print("user: ", user.user_email)
+        data = (
+            session.query(Record)
+            .select_from(User)
+            .join(Record, Record.user_id == User.id)
+            .filter(User.user_email == user.user_email, Record.record_trashcan==1).all()
+        )
+        response_object["item"] = [{"Record.id": row.id, "Record.project_id": row.project_id} for row in data]
+        response_object["message"] = "垃圾桶顯示成功"
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "垃圾桶顯示失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object)
+    return jsonify(response_object)
 
 if __name__ == "__main__":
     app.run(debug=True)

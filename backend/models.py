@@ -100,6 +100,7 @@ class Record(db.Model):
     record_host_name = db.Column(db.String(50), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    record_trashcan = db.Column(db.Integer, nullable=False)
 
 class SearchHistory(db.Model):
     __tablename__ = 'search_history'
@@ -114,6 +115,7 @@ class Tag(db.Model):
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     tag_name = db.Column(db.String(20), nullable=True)
+    tag_class = db.Column(db.String(5), nullable=True)
 
     def __repr__(self):
         return f'<Tag id={self.id} tag_name={self.tag_name}>'
