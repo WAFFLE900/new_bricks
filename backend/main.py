@@ -15,6 +15,7 @@ from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
 from authlib.integrations.flask_client import OAuth
 
+
 load_dotenv()
 
 # db_username = os.environ.get('DB_USERNAME')
