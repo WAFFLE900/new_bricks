@@ -14,7 +14,7 @@ from sqlalchemy import create_engine, text, desc, and_, or_, exists, func
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
-from authlib.integrations.flask_client import OAuth
+# from authlib.integrations.flask_client import OAuth
 
 load_dotenv()
 
@@ -42,21 +42,21 @@ Session=sessionmaker(bind=engine)
 session=Session()
 
 # Google OAuth configs
-oauth = OAuth(app)
-oauth.init_app(app)
-google_oauth = oauth.register(
-    name='google', # name of this method
-    client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
-    client_secret='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',
-    access_token_url='https://www.googleapis.com/oauth2/v4/token',
-    access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
-    authorize_params=None,
-    api_base_url='https://accounts.googleapis.com/oauth2/v3',
-    client_kwargs={'scope': 'openid profile email'},
-    server_metadata_url= 'https://accounts.google.com/.well-known/openid-configuration',
-    jwk_uri='https://www.googleapis.com/oauth2/v3/certs'
-)
+# oauth = OAuth(app)
+# oauth.init_app(app)
+# google_oauth = oauth.register(
+#     name='google', # name of this method
+#     client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
+#     client_secret='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',
+#     access_token_url='https://www.googleapis.com/oauth2/v4/token',
+#     access_token_params=None,
+#     authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
+#     authorize_params=None,
+#     api_base_url='https://accounts.googleapis.com/oauth2/v3',
+#     client_kwargs={'scope': 'openid profile email'},
+#     server_metadata_url= 'https://accounts.google.com/.well-known/openid-configuration',
+#     jwk_uri='https://www.googleapis.com/oauth2/v3/certs'
+# )
 
 
 # Flask authentication configs
