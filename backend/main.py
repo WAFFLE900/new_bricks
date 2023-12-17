@@ -1,4 +1,3 @@
-from queue import Empty
 from dotenv import load_dotenv
 from flask import Flask, current_app
 from flask_cors import CORS
@@ -10,11 +9,11 @@ import jwt
 import logging
 from flask import Flask, jsonify, request, current_app
 from time import time
-from sqlalchemy import create_engine, text, desc, and_, or_, exists, func
+from sqlalchemy import create_engine, text
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
-# from authlib.integrations.flask_client import OAuth
+from authlib.integrations.flask_client import OAuth
 
 load_dotenv()
 
@@ -42,21 +41,21 @@ Session=sessionmaker(bind=engine)
 session=Session()
 
 # Google OAuth configs
-# oauth = OAuth(app)
-# oauth.init_app(app)
-# google_oauth = oauth.register(
-#     name='google', # name of this method
-#     client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
-#     client_secret='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',
-#     access_token_url='https://www.googleapis.com/oauth2/v4/token',
-#     access_token_params=None,
-#     authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
-#     authorize_params=None,
-#     api_base_url='https://accounts.googleapis.com/oauth2/v3',
-#     client_kwargs={'scope': 'openid profile email'},
-#     server_metadata_url= 'https://accounts.google.com/.well-known/openid-configuration',
-#     jwk_uri='https://www.googleapis.com/oauth2/v3/certs'
-# )
+oauth = OAuth(app)
+oauth.init_app(app)
+google_oauth = oauth.register(
+    name='google', # name of this method
+    client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
+    client_secret='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',
+    access_token_url='https://www.googleapis.com/oauth2/v4/token',
+    access_token_params=None,
+    authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
+    authorize_params=None,
+    api_base_url='https://accounts.googleapis.com/oauth2/v3',
+    client_kwargs={'scope': 'openid profile email'},
+    server_metadata_url= 'https://accounts.google.com/.well-known/openid-configuration',
+    jwk_uri='https://www.googleapis.com/oauth2/v3/certs'
+)
 
 
 # Flask authentication configs
@@ -113,18 +112,6 @@ def make_JWT(user_email):
         algorithm='HS256')
     return token
 
-
-
-# hello world route
-@app.route('/', methods=['GET'])
-def greetings():
-    return ("Hello, world!")
-
-
-@app.route('/bricks', methods=['GET'])
-def bricks():
-    return ("Bricks專案管理實用工具讚讚!")
-
 @app.route('/oauth_test')
 @auth.login_required(optional=True)
 def index():
@@ -135,6 +122,16 @@ def index():
                         "user":user.user_email})
     else:
         return jsonify({"text":"歡迎使用Bricks專案管理實用工具，請先登入"})
+
+# hello world route
+@app.route('/', methods=['GET'])
+def greetings():
+    return ("Hello, world!")
+
+
+@app.route('/bricks', methods=['GET'])
+def bricks():
+    return ("Bricks專案管理實用工具讚讚!")
 
 
 @app.route('/google_login', methods=['POST'])
@@ -148,7 +145,7 @@ def google_login():
             'message':"Google登入失敗"
         }
         return jsonify(response_object)
-    
+
     # succeed to login with Google, then check the database for the login user
     user_info = token['userinfo']
     try:
@@ -165,7 +162,7 @@ def google_login():
             'message':"資料庫錯誤"
         }
         return jsonify(response_object)
-    
+
     # email and password are verified
     response_object = {'status': "success",
                         'message': "登入成功"}
@@ -287,7 +284,7 @@ def register_survey():
     return jsonify(response_object)
 
 
-def row2dict(SQL_data):    
+def row2dict(SQL_data):
     data = []
     for row in SQL_data:
         d = {}
@@ -327,8 +324,8 @@ def get_project():
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
-            return jsonify(response_object), 404 
-        data = get_data(SQL_q) 
+            return jsonify(response_object), 404
+        data = get_data(SQL_q)
         response_object["items"] = data
         response_object["message"] = "正在進行專案"
 
@@ -348,7 +345,7 @@ def get_project():
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
             return jsonify(response_object), 404
-        data = get_data(SQL_q)    
+        data = get_data(SQL_q)
         response_object["items"] = data
         response_object["message"] = "已結束專案"
 
@@ -417,7 +414,7 @@ def add_project():
         session.flush()
         session.commit()
         print(new_project.id)
-        
+
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = "新增失敗"
@@ -511,7 +508,7 @@ def trashcan():
 def search():
     response_object = {'status': 'success'}
     post_data = request.get_json()
-    
+
     try:
         rank_score = []
         status = post_data.get("search_status")
@@ -523,31 +520,30 @@ def search():
             project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_trashcan == True).all()
         elif status == "":
             project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id")).all()
-        
+
         for project in project_list:
             d = {}
             for column in project.__table__.columns:
                 d[column.name] = str(getattr(project, column.name))
-            
+
 
             # 計算相似度（使用 fuzz.ratio 或 fuzz.token_sort_ratio）
             score = fuzz.ratio(project.project_name, post_data.get("search_content"))
             d['score'] = score
             rank_score.append(d)
             print(project.id, post_data.get("search_content"), project.project_name, fuzz.ratio(project.project_name, post_data.get("search_content")))
-        
+
         sorted_rank = sorted(rank_score, key = lambda x:x.get('score'), reverse=True)
         for i in sorted_rank:
             print(i["project_name"])
-        
+
 
     except Exception as e:
         response_object['status'] = "failure"
         print(str(e))
-    
-    response_object['items'] = sorted_rank
-    return jsonify(response_object) 
 
+    response_object['items'] = sorted_rank
+    return jsonify(response_object)
 
 # 回傳所有標籤
 @app.route('/tag_index', methods=['POST'])
@@ -788,6 +784,111 @@ def trashcan_record():
         logging.exception('Error at %s', 'division', exc_info=e)
         return jsonify(response_object)
     return jsonify(response_object)
+
+@app.route('/add_record', methods=['POST'])
+def add_record():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    try:
+        print(session.query(User).all())
+        new_record = Record(record_name=post_data.get("record_name"),
+                            record_department=None,
+                            record_attendances=None,
+                            record_place=None,
+                            record_host_name=None,
+                            record_trashcan=False,
+                            user_id=post_data.get("user_id"),
+                            project_id=post_data.get("project_id"))
+        session.add(new_record)
+        session.flush()
+        session.commit()
+        print(new_record.id)
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+        logging.exception('Error at %s', 'division', exc_info=e)
+        return jsonify(response_object), 404
+    response_object["message"] = "新增成功"
+    response_object["record_id"] = new_record.id
+    return jsonify(response_object)
+
+
+@app.route('/get_record_index', methods=['GET'])
+def get_record():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    try:
+        response_object["record"] = []
+        record_get = session.query(Record).join(Project, Record.project_id == Project.id).filter(Project.id == post_data.get("project_id")).filter(Record.record_trashcan == False)
+        for records in record_get:
+            tag_get = session.query(Tag).join(TagTextBox, Tag.id == TagTextBox.tag_id).join(TextBox, TagTextBox.textBox_id == TextBox.id).join(Record, TextBox.record_id == Record.id).filter(TextBox.record_id == str(getattr(records, "id")))
+            
+            return_tags = []
+            for tags in tag_get:
+                return_tags.append(str(getattr(tags, "tag_name")))
+
+
+            response_object["record"].append({'record_name':str(getattr(records, "record_name")),
+                                              'record_date':str(getattr(records, "record_date")),
+                                              'record_department':str(getattr(records, "record_department")),
+                                              'record_attendances':str(getattr(records, "record_attendances")),
+                                              'record_place':str(getattr(records, "record_place")),
+                                              'record_host_name':str(getattr(records, "record_place")),
+                                              'tags':return_tags
+                                              })
+
+    except Exception as e:
+        print(str(e))
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+    return jsonify(response_object)
+
+
+@app.route('/edit_record', methods=['POST'])
+def edit_record():
+    response_object = {"status": "success"}
+    post_data = request.get_json()
+    try:
+        session.query(Record).filter(Record.id == post_data.get("record_id")).update({
+            "record_name": post_data.get("record_name"),
+            "record_department": post_data.get("record_department"),
+            "record_attendances": post_data.get("record_attendances"),
+            "record_place": post_data.get("record_place")
+        })
+        session.commit()
+        response_object["message"] = "修改成功"
+    except Exception as e:
+        print(str(e))
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+    return jsonify(response_object)
+
+
+@app.route('/delete_record', methods=['POST'])
+def delete_record():
+    response_object = {"status": "success"}
+    post_data = request.get_json()
+    try:
+        record_count = session.query(Record).filter(Record.id == post_data.get("record_id")).count()
+        if record_count == 0:
+            response_object["status"] = "failed"
+            response_object["message"] = "查無紀錄"
+            return jsonify(response_object)
+        session.query(Record).filter(Record.id == post_data.get("record_id")).update({"record_trashcan": 1}
+)
+        session.commit()
+        response_object["message"] = "修改成功"
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+
+    return jsonify(response_object)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
