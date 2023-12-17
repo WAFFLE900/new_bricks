@@ -550,13 +550,14 @@ def search():
 
 
 # 回傳所有標籤
-@app.route('/tag_index', methods=['GET'])
+@app.route('/tag_index', methods=['POST'])
 @auth.login_required()
 def tag_index():
     response_object = {'status': 'success'}
+    post_data = request.get_json()
     user = auth.current_user()
     try:
-        id = request.args.get('id')
+        id = post_data.get('id')
         result = (
             session.query(Tag.tag_class, func.group_concat(func.DISTINCT(Tag.tag_name)).label('tag_names'))
             .select_from(Project)
@@ -750,7 +751,7 @@ def delete_texBox():
             )
             print(tag_id_counts)
             for tag_id, count in tag_id_counts:
-                session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id).delete()
+                session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id, TagTextBox.textBox_id == post_data.get("id")).delete()
                 session.flush()
                 # 如果標籤只在要刪除的文字方塊中，刪除標籤
                 if count == 1:
@@ -769,18 +770,16 @@ def delete_texBox():
     return jsonify(response_object)
 
 # 顯示垃圾桶中會議記錄
-@app.route('/trashcan_record', methods=['GET'])
+@app.route('/trashcan_record', methods=['POST'])
 @auth.login_required(optional=True)
 def trashcan_record():
     response_object = {'status': 'success'}
     try:
-        user = auth.current_user()
-        print("user: ", user.user_email)
+        # user = auth.current_user()
+        # print("user: ", user.user_email)
+        post_data = request.get_json()
         data = (
-            session.query(Record)
-            .select_from(User)
-            .join(Record, Record.user_id == User.id)
-            .filter(User.user_email == user.user_email, Record.record_trashcan==1).all()
+            session.query(Record).filter(Record.project_id == post_data.get("id"), Record.record_trashcan==1).all()
         )
         response_object["item"] = [{"Record.id": row.id, "Record.project_id": row.project_id} for row in data]
         response_object["message"] = "垃圾桶顯示成功"
