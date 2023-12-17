@@ -557,7 +557,7 @@ def tag_index():
     post_data = request.get_json()
     user = auth.current_user()
     try:
-        id = post_data.get('id')
+        id = post_data.get('project_id')
         result = (
             session.query(Tag.tag_class, func.group_concat(func.DISTINCT(Tag.tag_name)).label('tag_names'))
             .select_from(Project)
@@ -589,7 +589,7 @@ def tag_search():
     response_object = {'status': 'success'}
     try:
         post_data = request.get_json()
-        id = request.get_json().get("id") # project_id
+        id = request.get_json().get("project_id")
         user = auth.current_user()
         print("project_id: ", id)
         print("user_email: ", user.user_email)
@@ -652,8 +652,9 @@ def add_tag():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
-        textBox_id = post_data.get("id")
+        textBox_id = post_data.get("textBox_id")
         user = auth.current_user()
+        print("textBox_id: ", textBox_id)
         print("user_email: ", user.user_email)
         project_id = (
             session.query(Project.id)
@@ -689,7 +690,7 @@ def add_tag():
                 .first()
             )
             print("new_tagId: ", new_tagId[0])
-            new_tagTextBox=TagTextBox(tag_id=new_tagId[0], textBox_id=post_data.get("id"))
+            new_tagTextBox=TagTextBox(tag_id=new_tagId[0], textBox_id=post_data.get("textBox_id"))
             session.add(new_tagTextBox)
             session.flush()
             session.commit()
@@ -710,17 +711,17 @@ def delete_tag():
     response_object = {'status': 'success'}
     try:
         post_data = request.get_json()
-        dTag = session.query(Tag).filter(Tag.id==post_data.get("id")).first()
+        dTag = session.query(Tag).filter(Tag.id==post_data.get("tag_id")).first()
         print(dTag)
         if dTag is None:
             response_object["message"] = "標籤不存在"
         else:
-            session.query(TagTextBox).filter(TagTextBox.tag_id == post_data.get("id")).delete()
+            session.query(TagTextBox).filter(TagTextBox.tag_id == post_data.get("tag_id")).delete()
             session.flush()
             session.query(Tag).filter(Tag.id==post_data.get("id")).delete()
             session.flush()
             session.commit()
-            response_object["message"] = "刪除標籤{}成功".format(post_data.get("id"))
+            response_object["message"] = "刪除標籤{}成功".format(post_data.get("tag_id"))
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = "標籤尋找失敗"
@@ -735,7 +736,7 @@ def delete_texBox():
     response_object = {'status': 'success'}
     try:
         post_data = request.get_json()
-        tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("id")).all()
+        tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
         if tag_textboxs is Empty:
             response_object["message"] = "此文字方塊無標籤"
         else:
@@ -751,16 +752,16 @@ def delete_texBox():
             )
             print(tag_id_counts)
             for tag_id, count in tag_id_counts:
-                session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id, TagTextBox.textBox_id == post_data.get("id")).delete()
+                session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id, TagTextBox.textBox_id == post_data.get("textBox_id")).delete()
                 session.flush()
                 # 如果標籤只在要刪除的文字方塊中，刪除標籤
                 if count == 1:
                     session.query(Tag).filter(Tag.id == tag_id).delete()
                     session.flush()
-        session.query(TextBox).filter(TextBox.id == post_data.get("id")).delete()
+        session.query(TextBox).filter(TextBox.id == post_data.get("textBox_id")).delete()
         session.flush()
         session.commit()
-        response_object["message"] = "刪除文字方框{}成功".format(post_data.get("id"))
+        response_object["message"] = "刪除文字方框{}成功".format(post_data.get("textBox_id"))
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = "文字方塊刪除失敗"
@@ -771,15 +772,12 @@ def delete_texBox():
 
 # 顯示垃圾桶中會議記錄
 @app.route('/trashcan_record', methods=['POST'])
-@auth.login_required(optional=True)
 def trashcan_record():
     response_object = {'status': 'success'}
     try:
-        # user = auth.current_user()
-        # print("user: ", user.user_email)
         post_data = request.get_json()
         data = (
-            session.query(Record).filter(Record.project_id == post_data.get("id"), Record.record_trashcan==1).all()
+            session.query(Record).filter(Record.project_id == post_data.get("project_id"), Record.record_trashcan==1).all()
         )
         response_object["item"] = [{"Record.id": row.id, "Record.project_id": row.project_id} for row in data]
         response_object["message"] = "垃圾桶顯示成功"
