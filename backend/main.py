@@ -792,10 +792,11 @@ def add_record():
     try:
         print(session.query(User).all())
         new_record = Record(record_name=post_data.get("record_name"),
-                            record_department=None,
-                            record_attendances=None,
-                            record_place=None,
-                            record_host_name=None,
+                            record_date=post_data.get("record_date"),
+                            record_department=post_data.get("record_department"),
+                            record_attendances=post_data.get("record_attendances"),
+                            record_place=post_data.get("record_place"),
+                            record_host_name=post_data.get("record_host_name"),
                             record_trashcan=False,
                             user_id=post_data.get("user_id"),
                             project_id=post_data.get("project_id"))
@@ -880,7 +881,7 @@ def delete_record():
         session.query(Record).filter(Record.id == post_data.get("record_id")).update({"record_trashcan": 1}
 )
         session.commit()
-        response_object["message"] = "修改成功"
+        response_object["message"] = "刪除成功"
 
     except Exception as e:
         response_object["status"] = "failed"
@@ -889,6 +890,49 @@ def delete_record():
 
     return jsonify(response_object)
 
+
+@app.route('/recover_record', methods=['POST'])
+def recover_record():
+    response_object = {"status": "success"}
+    post_data = request.get_json()
+    try:
+        record_count = session.query(Record).filter(Record.id == post_data.get("record_id")).count()
+        if record_count == 0:
+            response_object["status"] = "failed"
+            response_object["message"] = "查無紀錄"
+            return jsonify(response_object)
+        session.query(Record).filter(Record.id == post_data.get("record_id")).update({"record_trashcan":0})
+        session.commit()
+        response_object["message"] = "復原成功"
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+
+    return jsonify(response_object)
+
+
+@app.route('/delete_record_permanent', methods=['POST'])
+def delete_record_permanent():
+    response_object = {"status": "success"}
+    post_data = request.get_json()
+    try:
+        record_count = session.query(Record).filter(Record.id == post_data.get("record_id")).count()
+        if record_count == 0:
+            response_object["status"] = "failed"
+            response_object["message"] = "查無紀錄"
+            return jsonify(response_object)
+
+        session.query(Record).filter(Record.id == post_data.get("record_id")).delete()
+        session.commit()
+        response_object["message"] = "刪除成功"
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+    return jsonify(response_object)
 
 if __name__ == "__main__":
     app.run(debug=True)
