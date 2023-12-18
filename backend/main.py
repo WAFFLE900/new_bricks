@@ -816,7 +816,7 @@ def add_record():
 
 
 @app.route('/get_record_index', methods=['GET'])
-def get_record():
+def get_record_index():
     response_object = {'status': 'success'}
     post_data = request.get_json()
     try:
@@ -890,6 +890,70 @@ def delete_record():
 
     return jsonify(response_object)
 
+@app.route('/get_record', methods=['POST'])
+def get_record():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    try:        
+        record_get = (
+            session.query(Record)
+            .join(Project, Record.project_id == Project.id)
+            .filter(Project.id == post_data.get("project_id"))
+            .filter(Record.id == post_data.get("record_id"))
+            .filter(Record.record_trashcan == 0)
+        )
+        record_data = row2dict(record_get)
+        response_object["record_info"] = record_data
+        textBox_list = []
+        textBox_get = (
+            session.query(TextBox)
+            .join(Record, TextBox.record_id == Record.id)
+            .filter(Record.id == post_data.get("record_id"))
+            .filter(Record.record_trashcan == 0)
+            .all()
+        )
+        textBox_data = row2dict(textBox_get)
+        print(textBox_data)
+        textBox_list.append(textBox_data)
+        response_object["textBox"] = textBox_list
+    except Exception as e:
+        print(str(e))
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+    return jsonify(response_object)
+
+@app.route('/add_textBox', methods=['POST'])
+def add_textBox():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    try:        
+        textBox = TextBox(textBox_content = post_data.get("textBox_content"),
+                    record_id = post_data.get("record_id"))
+        session.add(textBox)
+        session.commit()
+    except Exception as e:
+        print(str(e))
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+    response_object["message"] = f"新增[{post_data.get('textBox_content')}] 進 record[{post_data.get('record_id')}]成功"
+    return jsonify(response_object)   
+
+@app.route('/edit_textBox', methods=['POST'])
+def edit_textBox():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    try:        
+        session.query(TextBox).filter(TextBox.id == post_data.get("textBox_id")).update({
+            "textBox_content": post_data.get("textBox_content")
+        })
+        session.commit()
+    except Exception as e:
+        print(str(e))
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+    response_object["message"] = f"修改 textBox[{post_data.get('textBox_id')}] 的內容成[{post_data.get('textBox_content')}]成功"
+    return jsonify(response_object)
 
 if __name__ == "__main__":
     app.run(debug=True)

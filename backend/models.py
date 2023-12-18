@@ -124,8 +124,9 @@ class Tag(db.Model):
 class TagTextBox(db.Model):
     __tablename__ = 'tag_textBox'
 
-    tag_id = db.Column(db.Integer, primary_key=True)
-    textBox_id = db.Column(db.Integer, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=False)
+    textBox_id = db.Column(db.Integer, db.ForeignKey('textBox.id'), nullable=False)
     
     def __repr__(self):
         return f'<Tag id={self.tag_id} textBox_id={self.textBox_id}>'
@@ -135,7 +136,7 @@ class TextBox(db.Model):
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     textBox_content = db.Column(db.String(300))
-    record_id = db.Column(db.Integer, nullable=False)
+    record_id = db.Column(db.Integer, db.ForeignKey('record.id'), nullable=False)
     
     def __repr__(self):
         return f'<TextBox id={self.id} textBox_content={self.textBox_content} record_id={self.record_id}>'
