@@ -94,7 +94,7 @@ class Record(db.Model):
     __tablename__ = 'record'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     record_name = db.Column(db.String(50), nullable=True)
-    record_date = db.Column(db.Date, nullable=True)
+    record_date = db.Column(db.String(50), nullable=True)
     record_department = db.Column(db.String(50), nullable=True)
     record_attendances = db.Column(db.Integer, nullable=True)
     record_place= db.Column(db.String(50), nullable=True)
