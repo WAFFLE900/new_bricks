@@ -9,12 +9,12 @@ import jwt
 import logging
 from flask import Flask, jsonify, request, current_app
 from time import time
-from sqlalchemy import create_engine, text, desc, and_, exists
+from sqlalchemy import create_engine, text, desc, and_, exists, func
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
 from authlib.integrations.flask_client import OAuth
-
+import json
 
 load_dotenv()
 
@@ -591,7 +591,20 @@ def tag_search():
         print("user_email: ", user.user_email)
 
         date_projects = (
-            session.query(TextBox.id, TextBox.record_id, TextBox.textBox_content, func.count(Tag.id).label('tag_count'))
+            session.query(
+                TextBox.id.label("TextBox_id"),
+                TextBox.record_id,
+                TextBox.textBox_content,
+                func.concat(
+                    '[',
+                    func.group_concat(
+                        func.concat(
+                            '{"Tag_id": ', Tag.id, ', "Tag_name": "', Tag.tag_name, '", "Tag_class": "', Tag.tag_class, '"}'
+                        )
+                    ),
+                    ']'
+                ).label("Tag")
+            )
             .select_from(User)
             .join(Project, User.id == Project.user_id)
             .join(Record, Project.id == Record.project_id)
@@ -600,14 +613,27 @@ def tag_search():
             .join(Tag, TagTextBox.tag_id == Tag.id)
             .filter(Project.id == id, User.user_email == user.user_email)
             .filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
-            .group_by(TextBox.id)
-            .order_by(desc('tag_count'))
+            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            .order_by(desc(func.count(Tag.id)))
             .all()
         )
         print("date_project: ", date_projects)
 
         undate_projects = (
-            session.query(TextBox.id, TextBox.record_id, TextBox.textBox_content, func.count(Tag.id).label('tag_count'))
+            session.query(
+                TextBox.id.label("TextBox_id"),
+                TextBox.record_id,
+                TextBox.textBox_content,
+                func.concat(
+                    '[',
+                    func.group_concat(
+                        func.concat(
+                            '{"Tag_id": ', Tag.id, ', "Tag_name": "', Tag.tag_name, '", "Tag_class": "', Tag.tag_class, '"}'
+                        )
+                    ),
+                    ']'
+                ).label("Tag")
+            )
             .select_from(User)
             .join(Project, User.id == Project.user_id)
             .join(Record, Project.id == Record.project_id)
@@ -624,15 +650,36 @@ def tag_search():
                 ))
                 .correlate_except(TextBox)
             )
-            .group_by(TextBox.id)
-            .order_by(desc('tag_count'))
+            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            .order_by(desc(func.count(Tag.id)))
             .all()
         )
-        undate_projects = [item for item in undate_projects if item not in date_projects]
+        undate_projects = [
+            item
+            for item in undate_projects
+            if item['TextBox_id'] not in [row['TextBox_id'] for row in date_projects]
+        ]
         print(undate_projects)
-        response_object["item"] = {"match": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in date_projects],
-                                   "unmatch": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in undate_projects]
-                                   }
+        response_object["item"] = {
+            "match": [
+                {
+                    "TextBox_id": row.TextBox_id,
+                    "record_id": row.record_id,
+                    "textBox_content": row.textBox_content,
+                    "Tag": json.loads(f"[{row.Tag}]")
+                }
+                for row in date_projects
+            ],
+            "unmatch": [
+                 {
+                    "TextBox_id": row.TextBox_id,
+                    "record_id": row.record_id,
+                    "textBox_content": row.textBox_content,
+                    "Tag": json.loads(f"[{row.Tag}]")
+                }
+                for row in undate_projects
+            ]
+        }
         response_object["message"] = "標籤回傳成功"
     except Exception as e:
         response_object["status"] = "failed"
