@@ -1,0 +1,35 @@
+<svg width="160" height="174" viewBox="0 0 160 174" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="empty__image">
+<path id="Oval-Copy-2" fill-rule="evenodd" clip-rule="evenodd" d="M80 173.382C124.183 173.382 160 169.151 160 163.931C160 158.711 116.082 157.18 71.8987 157.18C27.716 157.18 0 158.711 0 163.931C0 169.151 35.8172 173.382 80 173.382Z" fill="#F7F8FC"/>
+<path id="Rectangle-Copy-14" fill-rule="evenodd" clip-rule="evenodd" d="M26.329 90.3445H107.342L85.0632 116.674H4.05054L26.329 90.3445Z" fill="#DCDFE6"/>
+<g id="Group-Copy">
+<path id="Rectangle-Copy-10" fill-rule="evenodd" clip-rule="evenodd" d="M132.762 59.9253L99.7221 44.5184L93.9681 32.8965L127.008 48.3034L132.762 59.9253Z" fill="#DCDFE6"/>
+<path id="Rectangle-Copy-11" fill-rule="evenodd" clip-rule="evenodd" d="M132.762 59.9253L63.0109 27.3997L32.1972 93.4799L101.949 126.005L132.762 59.9253Z" fill="#D4D7DE"/>
+<path id="Rectangle-Copy-12" d="M63.0112 27.3998L31.8066 12.8489L0.992954 78.929L32.1975 93.4799L63.0112 27.3998Z" fill="url(#paint0_linear_2492_14725)"/>
+<path id="Rectangle-Copy-13" fill-rule="evenodd" clip-rule="evenodd" d="M31.8068 12.8489L63.0113 27.3998L94.7007 26.534L63.4962 11.9831L31.8068 12.8489Z" fill="#E4E7ED"/>
+</g>
+<path id="Rectangle-Copy-15" d="M107.342 90.3445H26.3291V163.256H107.342V90.3445Z" fill="url(#paint1_linear_2492_14725)"/>
+<g id="Rectangle-Copy-17">
+<mask id="mask0_2492_14725" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="107" y="90" width="35" height="74">
+<g id="mask-4-1">
+<path id="Vector" d="M141.772 90.3445H107.342V163.256H141.772V90.3445Z" fill="white"/>
+</g>
+</mask>
+<g mask="url(#mask0_2492_14725)">
+<path id="Mask" d="M107.342 90.3445H141.772V163.256H107.342V90.3445Z" fill="#C0C4CC"/>
+<path id="Rectangle-Copy" fill-rule="evenodd" clip-rule="evenodd" d="M141.772 90.3445H107.342L115.443 126.8L155.949 122.75L141.772 90.3445Z" fill="#A8ABB2"/>
+</g>
+</g>
+<path id="Rectangle-Copy-18" fill-rule="evenodd" clip-rule="evenodd" d="M141.772 90.3445H107.342L125.57 116.674H160L141.772 90.3445Z" fill="#E4E7ED"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_2492_14725" x1="43.9297" y1="18.5019" x2="44.2652" y2="87.7096" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FCFCFD"/>
+<stop offset="1" stop-color="#EEEFF3"/>
+</linearGradient>
+<linearGradient id="paint1_linear_2492_14725" x1="26.3291" y1="97.2711" x2="100.453" y2="163.983" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FCFCFD"/>
+<stop offset="1" stop-color="#E9EBEF"/>
+</linearGradient>
+</defs>
+</svg>
