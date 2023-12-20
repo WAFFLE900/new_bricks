@@ -176,45 +176,49 @@ def google_login():
 
 @app.route('/bricks_login', methods=['POST'])
 def bricks_login():
-    response_object = {'status': 'success'}
-    response_object['message'] = "登入成功"
     post_data = request.get_json()
     try:
         user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        response_object['user_id'] = user.id
-        user_password = user.user_password
-        hash_user_password = hash_password(post_data.get("user_password"))
-        if user_password != hash_user_password:
-            response_object['status'] = "failure"
-            response_object['message'] = "您的密碼不正確，請再試一次"
+        if user.user_password is None:
+            response_object = {
+                'status' : "failure",
+                'message' : "請使用其他方式登入"
+            }
             return jsonify(response_object)
-    except IndexError:
-        response_object['status'] = "failure"
-        response_object['message'] = "您的帳號不正確，請再試一次"
+        elif user.user_password != hash_password(post_data.get("user_password")):
+            response_object = {
+                'status' : "failure",
+                'message' : "您的密碼不正確"
+            }
+            return jsonify(response_object)
+    except exc.NoResultFound:
+        response_object = {
+            'status':'failure',
+            'message':"您的帳號不正確"
+        }
         return jsonify(response_object)
     except:
-        response_object['status'] = "failure"
-        response_object['message'] = "SELECT user_id 失敗"
+        response_object = {
+            'status':'failure',
+            'message':"資料庫錯誤"
+        }
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        current_app.config['SECRET_KEY'],
-        algorithm='HS256')
-
-    return token
+    # email and password are verified
+    response_object = {'status': "success",
+                        'message': "登入成功"}
+    response = jsonify(response_object)
+    token = make_JWT(post_data.get("user_email")) # issue a JWT token as authorization
+    response.headers['Authorization'] = f"Bearer {token}"
+    return response
 
 
 #註冊 --> 對比信箱及存入信箱、密碼及使用者名稱
 @app.route('/register', methods=['POST'])
-def register():
-    response_object = {'status': 'success'}
-    response_object['message'] = "信箱註冊成功"
+def bricks_register():
+    response_object = {'status': 'success',
+                       'message':'信箱註冊成功'}
+
     post_data = request.get_json()
     if ((post_data.get("user_email") == None) |
         (post_data.get("user_password") == None) |
@@ -228,27 +232,22 @@ def register():
             response_object['status'] = "failure"
             response_object['message'] = "此信箱已被註冊過"
             return jsonify(response_object)
-        hash_user_password = hash_password(post_data.get("user_password"))
-        new_user=User(user_email=post_data.get('user_email'),user_password=hash_user_password,
-                      user_name=post_data.get('user_name'))
+
+        new_user=User(user_email = post_data.get('user_email'),
+                      user_password = hash_password(post_data.get('user_password')),
+                      user_name = post_data.get('user_name'))
         session.add(new_user)
-        response_object['user_id'] = new_user.id
+        session.commit()
     except:
         response_object['status'] = "failure"
-        response_object['message'] = "註冊失敗，請稍後再試"
+        response_object['message'] = "資料庫錯誤"
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        app.config['SECRET_KEY'],
-        algorithm='HS256')
-
-    return token
+    # The registration succeeds
+    response = jsonify(response_object)
+    token = make_JWT(post_data.get("user_email")) # issue a JWT token as authorization
+    response.headers['Authorization'] = f"Bearer {token}"
+    return response
 
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
