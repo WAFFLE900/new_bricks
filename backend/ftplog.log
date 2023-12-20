@@ -1,0 +1,21 @@
+2023-05-13 21:32:35,535 ERROR Failed to upload to ftp: (pymysql.err.ProgrammingError) (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WHERE id = 6' at line 3")
+[SQL: 
+            INSERT INTO users (user_purpose, user_identity, user_otherTool)
+            VALUES ("['營隊']", "學生", "學生")
+            WHERE id = 6;
+        ]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2023-05-13 21:33:17,726 ERROR Failed to upload to ftp: (pymysql.err.ProgrammingError) (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WHERE id = 6' at line 3")
+[SQL: 
+            INSERT INTO users (user_purpose, user_identity, user_otherTool)
+            VALUES ("['營隊']", "學生", "學生")
+            WHERE id = 6;
+        ]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2023-05-13 21:33:49,015 ERROR Failed to upload to ftp: (pymysql.err.ProgrammingError) (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WHERE id = 6' at line 3")
+[SQL: 
+            INSERT INTO users (user_purpose, user_identity, user_otherTool)
+            VALUES ("['營隊']", "學生", "學生")
+            WHERE id = 6;
+        ]
+(Background on this error at: https://sqlalche.me/e/20/f405)
