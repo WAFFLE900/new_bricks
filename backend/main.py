@@ -9,7 +9,7 @@ import jwt
 import logging
 from flask import Flask, jsonify, request, current_app
 from time import time
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, desc, and_, exists
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
@@ -629,6 +629,7 @@ def tag_search():
             .order_by(desc('tag_count'))
             .all()
         )
+        undate_projects = [item for item in undate_projects if item not in date_projects]
         print(undate_projects)
         response_object["item"] = {"match": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in date_projects],
                                    "unmatch": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in undate_projects]
@@ -734,7 +735,7 @@ def delete_texBox():
     try:
         post_data = request.get_json()
         tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
-        if tag_textboxs is Empty:
+        if not tag_textboxs:
             response_object["message"] = "此文字方塊無標籤"
         else:
             tag_ids = [record.tag_id for record in tag_textboxs]
