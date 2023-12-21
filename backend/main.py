@@ -654,30 +654,26 @@ def tag_search():
             .order_by(desc(func.count(Tag.id)))
             .all()
         )
-        undate_projects = [
-            item
-            for item in undate_projects
-            if item['TextBox_id'] not in [row['TextBox_id'] for row in date_projects]
-        ]
         print(undate_projects)
         response_object["item"] = {
             "match": [
                 {
-                    "TextBox_id": row.TextBox_id,
-                    "record_id": row.record_id,
-                    "textBox_content": row.textBox_content,
-                    "Tag": json.loads(f"[{row.Tag}]")
+                    "TextBox_id": row[0],
+                    "record_id": row[1],
+                    "textBox_content": row[2],
+                    "Tag": json.loads(f"[{row[3]}]")
                 }
                 for row in date_projects
             ],
             "unmatch": [
-                 {
-                    "TextBox_id": row.TextBox_id,
-                    "record_id": row.record_id,
-                    "textBox_content": row.textBox_content,
-                    "Tag": json.loads(f"[{row.Tag}]")
+                {
+                    "TextBox_id": row[0],
+                    "record_id": row[1],
+                    "textBox_content": row[2],
+                    "Tag": json.loads(f"[{row[3]}]")
                 }
                 for row in undate_projects
+                if row[0] not in [row[0] for row in date_projects]
             ]
         }
         response_object["message"] = "標籤回傳成功"
