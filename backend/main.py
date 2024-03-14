@@ -26,9 +26,9 @@ load_dotenv()
 
 db_username = 'bricks'
 db_password = 'NCCUgdsc1234!'
-db_host = '35.194.196.179'
+db_host = '104.199.143.218'
 db_port = '3306'
-db_name = 'bricksdata_test'
+db_name = 'bricksdata'
 
 
 app = Flask(__name__)
@@ -842,7 +842,7 @@ def add_record():
                             record_place=post_data.get("record_place"),
                             record_host_name=post_data.get("record_host_name"),
                             record_trashcan=False,
-                            user_id=post_data.get("user_id"),
+                            user_id="34",
                             project_id=post_data.get("project_id"))
         session.add(new_record)
         session.flush()
