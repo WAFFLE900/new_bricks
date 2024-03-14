@@ -26,9 +26,9 @@ load_dotenv()
 
 db_username = 'bricks'
 db_password = 'NCCUgdsc1234!'
-db_host = '35.194.196.179'
+db_host = '104.199.143.218'
 db_port = '3306'
-db_name = 'bricksdata_test'
+db_name = 'bricksdata'
 
 
 app = Flask(__name__)
