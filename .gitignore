@@ -1,0 +1,24 @@
+.DS_Store
+node_modules/
+dist/
+
+# Python virtual environment
+venv/
+
+# local env files
+.env.local
+.env.*.local
+
+# Environment configuration file
+.env
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor settings
+.vscode
+
+__pycache__/

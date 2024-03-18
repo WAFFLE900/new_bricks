@@ -93,13 +93,15 @@ class ProjectSort(db.Model):
 class Record(db.Model):
     __tablename__ = 'record'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    record_date = db.Column(db.Date, nullable=True)
+    record_name = db.Column(db.String(50), nullable=True)
+    record_date = db.Column(db.String(50), nullable=True)
     record_department = db.Column(db.String(50), nullable=True)
     record_attendances = db.Column(db.Integer, nullable=True)
     record_place= db.Column(db.String(50), nullable=True)
     record_host_name = db.Column(db.String(50), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    record_trashcan = db.Column(db.Integer, nullable=False)
 
 class SearchHistory(db.Model):
     __tablename__ = 'search_history'
@@ -114,6 +116,7 @@ class Tag(db.Model):
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     tag_name = db.Column(db.String(20), nullable=True)
+    tag_class = db.Column(db.String(5), nullable=True)
 
     def __repr__(self):
         return f'<Tag id={self.id} tag_name={self.tag_name}>'
@@ -121,8 +124,9 @@ class Tag(db.Model):
 class TagTextBox(db.Model):
     __tablename__ = 'tag_textBox'
 
-    tag_id = db.Column(db.Integer, primary_key=True)
-    textBox_id = db.Column(db.Integer, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey('tag.id'), nullable=False)
+    textBox_id = db.Column(db.Integer, db.ForeignKey('textBox.id'), nullable=False)
     
     def __repr__(self):
         return f'<Tag id={self.tag_id} textBox_id={self.textBox_id}>'
@@ -132,7 +136,7 @@ class TextBox(db.Model):
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     textBox_content = db.Column(db.String(300))
-    record_id = db.Column(db.Integer, nullable=False)
+    record_id = db.Column(db.Integer, db.ForeignKey('record.id'), nullable=False)
     
     def __repr__(self):
         return f'<TextBox id={self.id} textBox_content={self.textBox_content} record_id={self.record_id}>'
@@ -142,7 +146,7 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_email = db.Column(db.String(64), unique=True, nullable=False)
-    user_password = db.Column(db.String(128), nullable=False)
+    user_password = db.Column(db.String(128), nullable=True)
     user_name = db.Column(db.String(16), nullable=False)
     user_purpose = db.Column(db.String(10), nullable=True)
     user_identity = db.Column(db.String(10), nullable=True)
