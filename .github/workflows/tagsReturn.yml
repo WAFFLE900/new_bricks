@@ -40,10 +40,9 @@ jobs:
     - name: Stop Flask app
       run: |
         sudo pkill -f flask -9
-      '''
-        if [ -f flask_pid.txt ]; then
-          kill $(cat flask_pid.txt)
-        else
-          echo "flask_pid.txt does not exist"
-        fi
-      '''
+      
+#        if [ -f flask_pid.txt ]; then
+#          kill $(cat flask_pid.txt)
+#        else
+#          echo "flask_pid.txt does not exist"
+#        fi
