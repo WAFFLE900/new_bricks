@@ -37,9 +37,9 @@ jobs:
       run: |
         # Run your tests here
         
-    - name: Stop Flask app
-      run: |
-        sudo pkill -f flask -9
+#    - name: Stop Flask app
+#      run: |
+#        sudo pkill -f flask -9
       
 #        if [ -f flask_pid.txt ]; then
 #          kill $(cat flask_pid.txt)
