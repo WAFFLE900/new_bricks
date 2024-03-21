@@ -30,7 +30,7 @@ jobs:
         FLASK_APP: 'main.py'
       run: |
         cd backend
-        python -m flask run --debug
+        python -m flask run --debug & echo "Hello world!"
 # python -m flask run --debug & echo $! > flask_pid.txt
 
     - name: Run tests
