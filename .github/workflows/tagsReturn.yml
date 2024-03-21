@@ -29,6 +29,7 @@ jobs:
       env:
         FLASK_APP: 'main.py'
       run: |
+        cd backend
         python -m flask run --debug & echo $! > flask_pid.txt
 
     - name: Run tests
