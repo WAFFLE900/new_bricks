@@ -29,5 +29,5 @@ jobs:
         FLASK_APP: 'main.py'
       run: |
         cd backend
-	flask run --debug
+        flask run --debug
 
