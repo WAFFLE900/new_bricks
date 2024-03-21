@@ -38,4 +38,7 @@ jobs:
         
     - name: Stop Flask app
       run: |
-        kill $(cat flask_pid.txt)
+        if [ -f flask_pid.txt ]; then
+          kill $(cat flask_pid.txt)
+        else
+          echo "flask_pid.txt does not exist"
