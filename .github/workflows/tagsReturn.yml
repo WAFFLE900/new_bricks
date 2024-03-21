@@ -26,5 +26,7 @@ jobs:
 
     - name: Run Flask app
       env:
-    	FLASK_APP: 'main.py'  # Adjust the file name if necessary
-      run: flask run --debug
+    	FLASK_APP: 'main.py'
+      run: |
+      	cd backend
+      	flask run --debug
