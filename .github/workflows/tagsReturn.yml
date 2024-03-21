@@ -25,6 +25,6 @@ jobs:
         pip install -r ./backend/requirements.txt
 
     - name: Run Flask app
-      run: |
-      	export FLASK_APP=main.py
-      	flask run --debug
+      env:
+    	FLASK_APP: 'main.py'  # Adjust the file name if necessary
+      run: flask run --debug
