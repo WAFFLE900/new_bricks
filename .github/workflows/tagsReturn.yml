@@ -30,19 +30,9 @@ jobs:
         FLASK_APP: 'main.py'
       run: |
         cd backend
-        python -m flask run --debug & echo "Hello world!"
-# python -m flask run --debug & echo $! > flask_pid.txt
+        python -m flask run --debug & echo $! > flask_pid.txt
+        sleep 10
 
     - name: Run tests
       run: |
         # Run your tests here
-        
-#    - name: Stop Flask app
-#      run: |
-#        sudo pkill -f flask -9
-      
-#        if [ -f flask_pid.txt ]; then
-#          kill $(cat flask_pid.txt)
-#        else
-#          echo "flask_pid.txt does not exist"
-#        fi
