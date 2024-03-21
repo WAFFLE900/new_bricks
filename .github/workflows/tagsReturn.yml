@@ -26,6 +26,8 @@ jobs:
         pip install -r ./backend/requirements.txt
 
     - name: Start Flask app
+      env:
+        FLASK_APP: main.py
       run: |
         python -m flask run --debug & echo $! > flask_pid.txt
 
