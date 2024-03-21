@@ -2,6 +2,7 @@
 name: running flask
 # 觸發條件
 on:
+  workflow_dispatch:
   push:
     branches:
       - dev
@@ -29,5 +30,5 @@ jobs:
         FLASK_APP: 'main.py'
       run: |
         cd backend
-        flask run --debug
+        flask run
 
