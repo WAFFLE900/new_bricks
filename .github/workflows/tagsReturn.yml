@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest  # Change this to the appropriate OS
+    runs-on: ubuntu-latest  # Change this to the appropriate OS
 
     steps:
     - name: Checkout code
