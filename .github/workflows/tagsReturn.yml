@@ -27,7 +27,7 @@ jobs:
 
     - name: Start Flask app
       env:
-        FLASK_APP: main.py
+        FLASK_APP: 'main.py'
       run: |
         python -m flask run --debug & echo $! > flask_pid.txt
 
