@@ -1,4 +1,4 @@
-name: CI_get_record
+name: get_record
 
 on:
   workflow_dispatch:
