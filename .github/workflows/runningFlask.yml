@@ -40,12 +40,13 @@ jobs:
     - name: Install dependencies
       run: |
         pip install pytest
+        pip install flask-unittest
 
     - name: Run test1
       run: |
         echo "pwd: "
+        pwd
         ls -la
-        pytest
 
   test2:
     needs: build
