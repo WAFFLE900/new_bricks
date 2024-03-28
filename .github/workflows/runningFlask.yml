@@ -39,7 +39,7 @@ jobs:
     steps:
     - name: Run test1
       run: |
-        python ../tests/test1.py
+        python tests/test1.py
 
   test2:
     needs: build
