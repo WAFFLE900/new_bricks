@@ -29,5 +29,5 @@ jobs:
         run:
           cd backend
           python -m flask run --debug & echo "Hello world!"
-          sleep 10
+          py app.py
 
