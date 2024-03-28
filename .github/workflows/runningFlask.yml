@@ -41,6 +41,7 @@ jobs:
       run: |
         echo "pwd: "
         ls -la
+        pytest
 
   test2:
     needs: build
