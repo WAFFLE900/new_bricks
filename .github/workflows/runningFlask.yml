@@ -39,6 +39,7 @@ jobs:
     - name: Run tests
       run: |
         echo "Run your test1 here"
+
   test2:
     needs: build
     runs-on: ubuntu-latest
@@ -47,14 +48,7 @@ jobs:
     - name: Run tests
       run: |
         echo "Run your tests here"
-        test1:
-          needs: build
-          runs-on: ubuntu-latest
-      
-          steps:
-          - name: Run tests
-            run: |
-              echo "Run your test2 here"
+        
   stop:
     needs: [test1, test2]
     runs-on: ubuntu-latest
