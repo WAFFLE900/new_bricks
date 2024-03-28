@@ -32,7 +32,7 @@ jobs:
         cd backend
         python -m flask run --debug &
   test:
-    
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
