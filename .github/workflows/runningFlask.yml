@@ -40,7 +40,8 @@ jobs:
     - name: Run test1
       run: |
         pwd
-        cd ../tests
+        cd tests
+        pwd
         python test1.py
 
   test2:
