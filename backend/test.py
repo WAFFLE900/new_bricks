@@ -1,9 +1,9 @@
 import unittest
-from app import *
+from app import app as application
 
 class TestApp(unittest.TestCase):
     def setUp(self):
-        self.app = app.test_client()
+        self.app = application.test_client()
         self.app.testing = True
 
     def test_get_record(self):
