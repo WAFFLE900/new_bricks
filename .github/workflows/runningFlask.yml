@@ -47,7 +47,7 @@ jobs:
         echo "pwd: "
         pwd
         ls -a
-        cd ..
+        cd backend
         pwd
         ls
 
