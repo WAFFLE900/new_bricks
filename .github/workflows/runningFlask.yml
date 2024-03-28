@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Change this to the appropriate OS
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
@@ -32,20 +32,10 @@ jobs:
         cd backend
         python -m flask run --debug &
   test:
-    runs-on: ubyntu-latest
+    
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-  
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
-  
-    - name: Install dependencies
-      run: |
-
     - name: Run tests
       run: |
         echo "Run your tests here"
