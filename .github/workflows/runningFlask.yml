@@ -31,17 +31,7 @@ jobs:
       run: |
         cd backend
         python -m flask run --debug &
-        # sleep(10)
-        # echo $! > flask_pid.txt
 
     - name: Run tests
       run: |
         # Run your tests here
-        
-    - name: Stop Flask app
-      run: |
-        if [ -f flask_pid.txt ]; then
-          kill $(cat flask_pid.txt)
-        else
-          echo "flask_pid.txt does not exist"
-        fi
