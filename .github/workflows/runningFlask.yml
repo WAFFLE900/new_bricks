@@ -47,6 +47,9 @@ jobs:
         echo "pwd: "
         pwd
         ls -la
+        cd ..
+        pwd
+        ls -la
 
   test2:
     needs: build
