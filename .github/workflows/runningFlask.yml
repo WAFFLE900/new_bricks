@@ -31,34 +31,27 @@ jobs:
       run: |
         cd backend
         python -m flask run --debug &
-  test_login:
+
+  test1:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-    - name: Run login_test
+    - name: Run test1
       run: |
-        python tests/login_test.py
+        python ../tests/test1.py
 
-  test:
+  test2:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-    - name: Run tests
+    - name: Run test2
       run: |
         echo "Run your tests here"
-  test_logout:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Run logout_test
-      run: |
-        echo "Run your logout_test here"
         
   deploy:
-    needs: [test_login, test, test_logout]
+    needs: [test1, test2]
     runs-on: ubuntu-latest
 
     steps:
