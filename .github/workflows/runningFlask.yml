@@ -46,10 +46,10 @@ jobs:
       run: |
         echo "pwd: "
         pwd
-        ls -la
+        ls -a
         cd ..
         pwd
-        ls -la
+        ls
 
   test2:
     needs: build
