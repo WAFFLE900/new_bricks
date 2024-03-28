@@ -40,8 +40,7 @@ jobs:
     - name: Run test1
       run: |
         echo "pwd: "
-        pwd
-        ls
+        ls -la
 
   test2:
     needs: build
