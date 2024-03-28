@@ -37,6 +37,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install dependencies
+      run: |
+        pip install pytest
+
     - name: Run test1
       run: |
         echo "pwd: "
