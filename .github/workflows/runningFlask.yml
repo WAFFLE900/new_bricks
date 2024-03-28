@@ -31,7 +31,9 @@ jobs:
       run: |
         cd backend
         python -m flask run --debug &
-
+  test:
+    runs-on: ubyntu-latest
+    steps:
     - name: Run tests
       run: |
         # Run your tests here
