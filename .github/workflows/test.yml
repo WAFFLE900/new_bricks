@@ -27,7 +27,7 @@ jobs:
         env:
           FLASK_APP: 'main.py'
         run:
-          cd backend
+          cd "backend"
           python -m flask run --debug & echo "Hello world!"
           py app.py
 
