@@ -39,7 +39,7 @@ jobs:
     steps:
     - name: Run test1
       run: |
-        cd tests
+        cd ../tests
         python test1.py
 
   test2:
