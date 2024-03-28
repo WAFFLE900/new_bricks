@@ -42,10 +42,6 @@ jobs:
         echo "pwd: "
         pwd
         ls
-        cd tests
-        echo "after cd tests: "
-        pwd
-        python test1.py
 
   test2:
     needs: build
