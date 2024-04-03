@@ -78,10 +78,7 @@ jobs:
     steps:
     - name: Merge into dev
       run: |
-        git fetch
-        git branch -a
-        git checkout dev
-        git push origin dev
+        git status
 
     - name: Run deploy
       run: |
