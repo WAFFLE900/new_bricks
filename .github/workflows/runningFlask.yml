@@ -78,6 +78,7 @@ jobs:
     steps:
     - name: Merge into dev
       run: |
+        git init
         git checkout dev
         git push origin dev
 
