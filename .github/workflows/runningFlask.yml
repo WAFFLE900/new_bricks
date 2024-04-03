@@ -78,7 +78,6 @@ jobs:
     steps:
     - name: Merge into dev
       run: |
-        git init
         git fetch
         git branch -a
         git checkout dev
