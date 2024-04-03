@@ -76,6 +76,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Merge into dev
+      run: |
+        git checkout dev
+        git push origin dev
+
     - name: Run deploy
       run: |
         echo "run deploy"
