@@ -859,7 +859,7 @@ def add_record():
     return jsonify(response_object)
 
 
-@app.route('/get_record_index', methods=['GET'])
+@app.route('/get_record_index', methods=['POST'])
 def get_record_index():
     response_object = {'status': 'success'}
     post_data = request.get_json()
