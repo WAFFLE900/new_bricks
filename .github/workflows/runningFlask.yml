@@ -75,6 +75,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install dependencies
+      run: |
+        apt update && apt install -y git wget
+        url="$(wget -qO- https://api.github.com/repos/github/hub/releases/latest | tr '"' '\n' | grep '.*/download/.*/hub-linux-amd64-.*.tgz')"
+        wget -qO- "$url" | tar -xzvf- -C /usr/bin --strip-components=2 --wildcards "*/bin/hub"
+        
     - name: Set up git
       run: |
         git config --global user.name 'BensonFanNccu'
@@ -84,7 +90,7 @@ jobs:
         git pull origin feature/CI_for_pull_request_merge_dev
         git checkout feature/CI_for_pull_request_merge_dev
     
-    - name: pull-request
+    - name: Create PR
       uses: repo-sync/pull-request@v2
       with:
         destination_branch: "dev"
