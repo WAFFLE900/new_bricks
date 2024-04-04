@@ -32,5 +32,5 @@ jobs:
     - name: Run unit tests
       run: |
         pwd
-        cd backend/tests
+        cd "backend/tests"
         python -m unittest -v
