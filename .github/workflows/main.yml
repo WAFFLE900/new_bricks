@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    -name: Check directory
+    - name: Check directory
       run: |
         ls -al
         pwd
@@ -20,6 +20,7 @@ jobs:
         pwd
         cd tests
         ls -al
+
   # build:
   #   runs-on: ubuntu-latest
 
