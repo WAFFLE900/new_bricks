@@ -81,7 +81,7 @@ jobs:
         git config --global user.email '110306044@g.nccu.edu.tw'
         git init
         git remote add origin https://github.com/WAFFLE900/new_bricks.git
-        git pull
+        git pull origin feature/CI_for_pull_request_merge_dev
 
   deploy:
     needs: [test1, test2]
