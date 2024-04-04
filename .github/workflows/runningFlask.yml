@@ -84,12 +84,13 @@ jobs:
         git pull origin feature/CI_for_pull_request_merge_dev
         git checkout feature/CI_for_pull_request_merge_dev
     
-    - name: Create PR
-      uses: peter-evans/create-pull-request@v6
+    - name: pull-request
+      uses: repo-sync/pull-request@v2
       with:
-        title: "CI_for_pull_request_merge_dev"
-        body: "CI_for_pull_request_merge_dev"
-        commit-message: "CI test"
+        destination_branch: "dev"
+        github_token: "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"
+        pr_label: "feature, automated pr"
+        pr_title: "feature/CI_for_pull_request_merge_dev"
 
   deploy:
     needs: [test1, test2]
