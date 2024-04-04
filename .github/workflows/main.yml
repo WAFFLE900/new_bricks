@@ -25,6 +25,10 @@ jobs:
         pip install -r requirements.txt
 
   test:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Run unit tests
       run: |
         cd backend/test
