@@ -70,26 +70,6 @@ jobs:
     - name: Run test2
       run: |
         echo "Run your tests here"
-
-  merge_to_dev:
-    needs: [test1, test2]
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Set up Git
-      run: |
-        git config --global user.name 'BensonFanNccu'
-        git config --global user.email '110306044@g.nccu.edu.tw'
-        git init
-        git remote add origin https://github.com/WAFFLE900/new_bricks.git
-
-    - name: Create PR
-      uses: peter-evans/create-pull-request@v6
-      with:
-        title: "CI PR"
-        body: "test"
-        commit-message: "CI PR test"
-
         
   deploy:
     needs: [test1, test2]
