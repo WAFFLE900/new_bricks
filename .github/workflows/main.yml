@@ -11,11 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Check directory 1
+      run: |
+        ls -al
+        pwd
+
     - name: Checkout code
       uses: actions/checkout@v2
-      
 
-    - name: Check directory
+    - name: Check directory 2
       run: |
         ls -al
         pwd
