@@ -76,6 +76,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Set up Git
+      run: |
+        git config --local user.name 'BensonFanNccu'
+        git config --local user.email '110306044@g.nccu.edu.tw'
+        
     - name: Create PR
       uses: peter-evans/create-pull-request@v6
       with:
