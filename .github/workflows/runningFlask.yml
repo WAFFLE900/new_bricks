@@ -77,8 +77,8 @@ jobs:
     steps:
     - name: Set up git
       run: |
-        git config --global user.name 'Your Name'
-        git config --global user.email 'your.email@example.com'
+        git config --global user.name 'BensonFanNccu'
+        git config --global user.email '110306044@g.nccu.edu.tw'
         git remote add origin https://github.com/WAFFLE900/new_bricks.git
         git pull
 
