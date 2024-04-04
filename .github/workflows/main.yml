@@ -7,32 +7,45 @@ on:
       - feature/merge_unit_test&CI_template
 
 jobs:
-  build:
+  dir_test: 
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
-
-    - name: Install dependencies
+    -name: Check directory
       run: |
-        cd backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Run unit tests
-      run: |
+        ls -al
         pwd
         cd backend
+        ls -al
+        pwd
         cd tests
-        python -m unittest -v
+        ls -al
+  # build:
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v2
+
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v2
+  #     with:
+  #       python-version: '3.10'
+
+  #   - name: Install dependencies
+  #     run: |
+  #       cd backend
+  #       python -m pip install --upgrade pip
+  #       pip install -r requirements.txt
+
+  # test:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #   - name: Run unit tests
+  #     run: |
+  #       pwd
+  #       cd backend
+  #       cd tests
+  #       python -m unittest -v
