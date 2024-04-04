@@ -87,6 +87,7 @@ jobs:
     - name: Create PR
       uses: peter-evans/create-pull-request@v6
       with:
+        token: "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"
         title: "feature/CI_for_pull_request_merge_dev"
         body: "test"
         branch: feature/CI_for_pull_request_merge_dev
