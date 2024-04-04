@@ -75,14 +75,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update 2> /dev/null || true
-        sudo apt-get install -y git 
-        sudo apt-get install -y wget
-        url="$(sudo wget -qO- https://api.github.com/repos/github/hub/releases/latest | tr '"' '\n' | grep '.*/download/.*/hub-linux-amd64-.*.tgz')"
-        sudo wget -qO- "$url" | sudo tar -xzvf- -C /usr/bin --strip-components=2 --wildcards "*/bin/hub"
-
     - name: Set up git
       run: |
         git config --global user.name 'BensonFanNccu'
@@ -93,12 +85,12 @@ jobs:
         git checkout feature/CI_for_pull_request_merge_dev
     
     - name: Create PR
-      uses: repo-sync/pull-request@v2
+      uses: peter-evans/create-pull-request@v6
       with:
-        destination_branch: "dev"
-        github_token: "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"
-        pr_label: "feature, automated pr"
-        pr_title: "feature/CI_for_pull_request_merge_dev"
+        title: "feature/CI_for_pull_request_merge_dev"
+        body: "test"
+        branch: feature/CI_for_pull_request_merge_dev
+        base: dev
 
   deploy:
     needs: [test1, test2]
