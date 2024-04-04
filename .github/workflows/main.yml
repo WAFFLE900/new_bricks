@@ -27,5 +27,6 @@ jobs:
 
     - name: Run unit tests
       run: |
-        cd tests
+        ls -al
+        cd backend/tests
         python -m unittest -v
