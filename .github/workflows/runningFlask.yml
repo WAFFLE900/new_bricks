@@ -81,7 +81,7 @@ jobs:
         git config --global user.email '110306044@g.nccu.edu.tw'
         git config --global user.password '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'
         git init
-        git remote add origin https://github.com/WAFFLE900/new_bricks.git
+        git remote add origin git@github.com:WAFFLE900/new_bricks.git
         git pull origin feature/CI_for_pull_request_merge_dev
         git checkout feature/CI_for_pull_request_merge_dev
     
