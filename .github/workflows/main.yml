@@ -32,5 +32,4 @@ jobs:
     steps:
     - name: Run unit tests
       run: |
-        cd backend/test
         python -m unittest
