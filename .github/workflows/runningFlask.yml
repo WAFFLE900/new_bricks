@@ -79,7 +79,7 @@ jobs:
     - name: Merge into dev
       run: |
         git init
-        git remote add https://github.com/WAFFLE900/new_bricks.git
+        git remote add origin https://github.com/WAFFLE900/new_bricks.git
         git checkout dev
         git pull origin dev
         ls
