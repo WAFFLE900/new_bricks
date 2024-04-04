@@ -1,11 +1,10 @@
-# name of workflow
 name: running flask
-# 觸發條件
 on:
   workflow_dispatch:
   push:
     branches:
       - dev
+      - feature/CI_for_pull_request_merge_dev
 
 jobs:
   build:
@@ -70,7 +69,19 @@ jobs:
     - name: Run test2
       run: |
         echo "Run your tests here"
-        
+  
+  merge:
+    needs: [test1, test2]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up git
+      run: |
+        git config --global user.name 'Your Name'
+        git config --global user.email 'your.email@example.com'
+        git remote add origin https://github.com/WAFFLE900/new_bricks.git
+        git pull
+
   deploy:
     needs: [test1, test2]
     runs-on: ubuntu-latest
