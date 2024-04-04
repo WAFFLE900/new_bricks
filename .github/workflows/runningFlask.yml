@@ -80,6 +80,7 @@ jobs:
       run: |
         git init
         git remote add origin https://github.com/WAFFLE900/new_bricks.git
+        ls
         git pull origin dev
         ls
 
