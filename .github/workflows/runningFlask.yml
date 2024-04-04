@@ -82,6 +82,14 @@ jobs:
         git init
         git remote add origin https://github.com/WAFFLE900/new_bricks.git
         git pull origin feature/CI_for_pull_request_merge_dev
+        git checkout feature/CI_for_pull_request_merge_dev
+    
+    - name: Create PR
+      uses: peter-evans/create-pull-request@v6
+      with:
+        title: "CI_for_pull_request_merge_dev"
+        body: "CI_for_pull_request_merge_dev"
+        commit-message: "CI test"
 
   deploy:
     needs: [test1, test2]
