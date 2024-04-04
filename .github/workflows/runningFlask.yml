@@ -78,9 +78,11 @@ jobs:
     steps:
     - name: Merge into dev
       run: |
-        pwd
         git init
-        git status
+        git remote add https://github.com/WAFFLE900/new_bricks.git
+        git checkout dev
+        git pull origin dev
+        ls
 
     - name: Run deploy
       run: |
