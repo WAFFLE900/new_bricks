@@ -22,7 +22,8 @@ jobs:
     - name: Install dependencies
       run: |
         cd backend
-        
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
   test:
     needs: build
@@ -32,5 +33,6 @@ jobs:
     - name: Run unit tests
       run: |
         pwd
-        cd "backend/tests"
+        cd backend
+        cd tests
         python -m unittest -v
