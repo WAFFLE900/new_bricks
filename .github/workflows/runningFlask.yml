@@ -79,6 +79,7 @@ jobs:
       run: |
         git config --global user.name 'BensonFanNccu'
         git config --global user.email '110306044@g.nccu.edu.tw'
+        git init
         git remote add origin https://github.com/WAFFLE900/new_bricks.git
         git pull
 
