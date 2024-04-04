@@ -70,6 +70,19 @@ jobs:
     - name: Run test2
       run: |
         echo "Run your tests here"
+
+  merge_to_dev:
+    needs: [test1, test2]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Create PR
+      uses: peter-evans/create-pull-request@v6
+      with:
+        title: "CI PR"
+        body: "test"
+        commit-message: "CI PR test"
+
         
   deploy:
     needs: [test1, test2]
