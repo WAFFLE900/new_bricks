@@ -1,5 +1,5 @@
 # name of workflow
-name: Flask CI
+name: Flask CI test
 # 觸發條件
 on:
   push:
