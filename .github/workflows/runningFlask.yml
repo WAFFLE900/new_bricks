@@ -76,14 +76,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Merge into dev
-      run: |
-        git init
-        git remote add origin https://github.com/WAFFLE900/new_bricks.git
-        ls
-        git pull origin dev
-        ls
-
     - name: Run deploy
       run: |
         echo "run deploy"
