@@ -9,12 +9,12 @@ import jwt
 import logging
 from flask import Flask, jsonify, request, current_app
 from time import time
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, desc, and_, exists, func
 from models import *
 from sqlalchemy.orm import *
 from flask_httpauth import HTTPTokenAuth
 from authlib.integrations.flask_client import OAuth
-
+import json
 
 load_dotenv()
 
@@ -176,45 +176,49 @@ def google_login():
 
 @app.route('/bricks_login', methods=['POST'])
 def bricks_login():
-    response_object = {'status': 'success'}
-    response_object['message'] = "登入成功"
     post_data = request.get_json()
     try:
         user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        response_object['user_id'] = user.id
-        user_password = user.user_password
-        hash_user_password = hash_password(post_data.get("user_password"))
-        if user_password != hash_user_password:
-            response_object['status'] = "failure"
-            response_object['message'] = "您的密碼不正確，請再試一次"
+        if user.user_password is None:
+            response_object = {
+                'status' : "failure",
+                'message' : "請使用其他方式登入"
+            }
             return jsonify(response_object)
-    except IndexError:
-        response_object['status'] = "failure"
-        response_object['message'] = "您的帳號不正確，請再試一次"
+        elif user.user_password != hash_password(post_data.get("user_password")):
+            response_object = {
+                'status' : "failure",
+                'message' : "您的密碼不正確"
+            }
+            return jsonify(response_object)
+    except exc.NoResultFound:
+        response_object = {
+            'status':'failure',
+            'message':"您的帳號不正確"
+        }
         return jsonify(response_object)
     except:
-        response_object['status'] = "failure"
-        response_object['message'] = "SELECT user_id 失敗"
+        response_object = {
+            'status':'failure',
+            'message':"資料庫錯誤"
+        }
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        current_app.config['SECRET_KEY'],
-        algorithm='HS256')
-
-    return token
+    # email and password are verified
+    response_object = {'status': "success",
+                        'message': "登入成功"}
+    response = jsonify(response_object)
+    token = make_JWT(post_data.get("user_email")) # issue a JWT token as authorization
+    response.headers['Authorization'] = f"Bearer {token}"
+    return response
 
 
 #註冊 --> 對比信箱及存入信箱、密碼及使用者名稱
 @app.route('/register', methods=['POST'])
-def register():
-    response_object = {'status': 'success'}
-    response_object['message'] = "信箱註冊成功"
+def bricks_register():
+    response_object = {'status': 'success',
+                       'message':'信箱註冊成功'}
+
     post_data = request.get_json()
     if ((post_data.get("user_email") == None) |
         (post_data.get("user_password") == None) |
@@ -228,27 +232,22 @@ def register():
             response_object['status'] = "failure"
             response_object['message'] = "此信箱已被註冊過"
             return jsonify(response_object)
-        hash_user_password = hash_password(post_data.get("user_password"))
-        new_user=User(user_email=post_data.get('user_email'),user_password=hash_user_password,
-                      user_name=post_data.get('user_name'))
+
+        new_user=User(user_email = post_data.get('user_email'),
+                      user_password = hash_password(post_data.get('user_password')),
+                      user_name = post_data.get('user_name'))
         session.add(new_user)
-        response_object['user_id'] = new_user.id
+        session.commit()
     except:
         response_object['status'] = "failure"
-        response_object['message'] = "註冊失敗，請稍後再試"
+        response_object['message'] = "資料庫錯誤"
         return jsonify(response_object)
 
-    token = jwt.encode(
-        {
-            'user_email': post_data.get("user_email"),
-            'exp': int(time() + 60 * 60 * 24 * 30),
-            'status': "success",
-            'message': "登入成功"
-        },
-        app.config['SECRET_KEY'],
-        algorithm='HS256')
-
-    return token
+    # The registration succeeds
+    response = jsonify(response_object)
+    token = make_JWT(post_data.get("user_email")) # issue a JWT token as authorization
+    response.headers['Authorization'] = f"Bearer {token}"
+    return response
 
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
@@ -592,7 +591,20 @@ def tag_search():
         print("user_email: ", user.user_email)
 
         date_projects = (
-            session.query(TextBox.id, TextBox.record_id, TextBox.textBox_content, func.count(Tag.id).label('tag_count'))
+            session.query(
+                TextBox.id.label("TextBox_id"),
+                TextBox.record_id,
+                TextBox.textBox_content,
+                func.concat(
+                    '[',
+                    func.group_concat(
+                        func.concat(
+                            '{"Tag_id": ', Tag.id, ', "Tag_name": "', Tag.tag_name, '", "Tag_class": "', Tag.tag_class, '"}'
+                        )
+                    ),
+                    ']'
+                ).label("Tag")
+            )
             .select_from(User)
             .join(Project, User.id == Project.user_id)
             .join(Record, Project.id == Record.project_id)
@@ -601,14 +613,27 @@ def tag_search():
             .join(Tag, TagTextBox.tag_id == Tag.id)
             .filter(Project.id == id, User.user_email == user.user_email)
             .filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
-            .group_by(TextBox.id)
-            .order_by(desc('tag_count'))
+            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            .order_by(desc(func.count(Tag.id)))
             .all()
         )
         print("date_project: ", date_projects)
 
         undate_projects = (
-            session.query(TextBox.id, TextBox.record_id, TextBox.textBox_content, func.count(Tag.id).label('tag_count'))
+            session.query(
+                TextBox.id.label("TextBox_id"),
+                TextBox.record_id,
+                TextBox.textBox_content,
+                func.concat(
+                    '[',
+                    func.group_concat(
+                        func.concat(
+                            '{"Tag_id": ', Tag.id, ', "Tag_name": "', Tag.tag_name, '", "Tag_class": "', Tag.tag_class, '"}'
+                        )
+                    ),
+                    ']'
+                ).label("Tag")
+            )
             .select_from(User)
             .join(Project, User.id == Project.user_id)
             .join(Record, Project.id == Record.project_id)
@@ -625,14 +650,32 @@ def tag_search():
                 ))
                 .correlate_except(TextBox)
             )
-            .group_by(TextBox.id)
-            .order_by(desc('tag_count'))
+            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            .order_by(desc(func.count(Tag.id)))
             .all()
         )
         print(undate_projects)
-        response_object["item"] = {"match": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in date_projects],
-                                   "unmatch": [{'id': row.id, 'record_id': row.record_id, 'textBox_content': row.textBox_content} for row in undate_projects]
-                                   }
+        response_object["item"] = {
+            "match": [
+                {
+                    "TextBox_id": row[0],
+                    "record_id": row[1],
+                    "textBox_content": row[2],
+                    "Tag": json.loads(f"[{row[3]}]")
+                }
+                for row in date_projects
+            ],
+            "unmatch": [
+                {
+                    "TextBox_id": row[0],
+                    "record_id": row[1],
+                    "textBox_content": row[2],
+                    "Tag": json.loads(f"[{row[3]}]")
+                }
+                for row in undate_projects
+                if row[0] not in [row[0] for row in date_projects]
+            ]
+        }
         response_object["message"] = "標籤回傳成功"
     except Exception as e:
         response_object["status"] = "failed"
@@ -734,7 +777,7 @@ def delete_texBox():
     try:
         post_data = request.get_json()
         tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
-        if tag_textboxs is Empty:
+        if not tag_textboxs:
             response_object["message"] = "此文字方塊無標籤"
         else:
             tag_ids = [record.tag_id for record in tag_textboxs]

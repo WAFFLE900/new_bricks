@@ -1,0 +1,79 @@
+name: running flask
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r ./backend/requirements.txt
+
+    - name: Start Flask app
+      env:
+        FLASK_APP: 'main.py'
+      run: |
+        cd backend
+        python -m flask run --debug &
+
+  test1:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        pip install pytest
+        pip install flask-unittest
+
+    - name: Run test1
+      run: |
+        python backend/tests/test1.py
+
+  test2:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Run test2
+      run: |
+        echo "Run your tests here"
+
+  deploy:
+    needs: [test1, test2]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Run deploy
+      run: |
+        echo "run deploy"
