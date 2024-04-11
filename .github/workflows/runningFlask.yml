@@ -69,31 +69,6 @@ jobs:
     - name: Run test2
       run: |
         echo "Run your tests here"
-  
-  merge:
-    needs: [test1, test2]
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Set up git
-      run: |
-        git config --global user.name 'BensonFanNccu'
-        git config --global user.email '110306044@g.nccu.edu.tw'
-        git config --global user.password 'Fbi12098!'
-        git init
-        git remote add origin https://github.com/WAFFLE900/new_bricks.git
-        git pull origin feature/CI_for_pull_request_merge_dev
-        git checkout feature/CI_for_pull_request_merge_dev
-        git remote set-url origin https://x-access-token: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@github.com/$GITHUB_REPOSITORY
-    
-    - name: Create PR
-      uses: peter-evans/create-pull-request@v6
-      with:
-        token: "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"
-        title: "feature/CI_for_pull_request_merge_dev"
-        body: "test"
-        branch: feature/CI_for_pull_request_merge_dev
-        base: dev
 
   deploy:
     needs: [test1, test2]
