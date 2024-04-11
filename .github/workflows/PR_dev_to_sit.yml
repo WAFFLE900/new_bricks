@@ -1,4 +1,4 @@
-name: PR for dev to sit
+name: PR to sit
 on:
   push:
     branches:
