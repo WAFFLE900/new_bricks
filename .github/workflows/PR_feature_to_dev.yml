@@ -22,4 +22,8 @@ jobs:
           base: dev
           branch: ${{ github.REF }}
           delete-branch: true
+
+      - name: meaningless step
+        run: |
+          echo ":("
       
