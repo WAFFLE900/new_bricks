@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - feature/CI_for_pull_request_merge_dev
 
 jobs:
   build:
