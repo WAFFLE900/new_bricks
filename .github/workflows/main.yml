@@ -1,0 +1,32 @@
+# name of workflow
+name: Flask CI test
+# 觸發條件
+on:
+  push:
+    branches:
+      - feature/merge_unit_test&CI_template
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run unit tests
+      run: |
+        ls -al
+        cd backend/tests
+        python -m unittest -v
