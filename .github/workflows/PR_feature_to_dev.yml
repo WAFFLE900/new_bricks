@@ -21,8 +21,5 @@ jobs:
             [create-pull-request](https://github.com/peter-evans/create-pull-request).
           base: dev
           branch: ${{ github.REF }}
-          delete-branch: false
+          delete-branch: true
       
-      - name: Meaningless move
-        run: |
-          echo "delete me"
