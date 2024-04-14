@@ -141,7 +141,7 @@ def google_login():
     try:
         token = google_oauth.authorize_access_token()
     except:
-        response_object = {
+        response_object = { 
             'status':'failure',
             'message':"Google登入失敗"
         }
@@ -297,27 +297,25 @@ def row2dict(SQL_data):
 def get_project():
     response_object = {"status": "success"}
     post_data = request.get_json()
-    def get_data(sql):
-        data = {}
-        for project, project_sort in sql:
-            d = {}
-            for column in project.__table__.columns:
-                d[column.name] = str(getattr(project, column.name))
-            del d['project_type']
-            d['type_id'] = project_sort.type_id
-            if project.project_type not in data.keys():
-                data[project.project_type] = []
-            data[project.project_type].append(d)
-        return data
+    # def get_data(sql):
+    #     data = {}
+    #     for project, project_sort in sql:
+    #         d = {}
+    #         for column in project.__table__.columns:
+    #             d[column.name] = str(getattr(project, column.name))
+    #         del d['project_type']
+    #         d['type_id'] = project_sort.type_id
+    #         if project.project_type not in data.keys():
+    #             data[project.project_type] = []
+    #         data[project.project_type].append(d)
+    #     return data
     if post_data.get("project_status") == "normal":
         try:
-            SQL_q = session.query(Project, ProjectSort).join(ProjectSort, Project.project_type==ProjectSort.project_type).filter(
+            SQL_q = session.query(Project).filter(
                 Project.user_id==post_data.get("user_id"),
                 Project.project_trashcan==0,
-                Project.project_ended==0,
-                ProjectSort.user_id==post_data.get("user_id")
+                Project.project_ended==0
             ).order_by(
-                ProjectSort.project_type_sort.asc(),
                 Project.project_edit_date.desc()
             ).all()
         except Exception as e:
@@ -325,19 +323,17 @@ def get_project():
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
             return jsonify(response_object), 404
-        data = get_data(SQL_q)
+        data = row2dict(SQL_q)
         response_object["items"] = data
         response_object["message"] = "正在進行專案"
 
     elif post_data.get("project_status") == "ended":
         try:
-            SQL_q=session.query(Project, ProjectSort).join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
+            SQL_q=session.query(Project).filter(
                 Project.user_id==post_data.get("user_id"),
                 Project.project_trashcan==0,
-                Project.project_ended==1,
-                ProjectSort.user_id==post_data.get("user_id")
+                Project.project_ended==1
             ).order_by(
-                ProjectSort.project_type_sort.asc(),
                 Project.project_edit_date.desc()
             ).all()
         except Exception as e:
@@ -345,7 +341,7 @@ def get_project():
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
             return jsonify(response_object), 404
-        data = get_data(SQL_q)
+        data = row2dict(SQL_q)
         response_object["items"] = data
         response_object["message"] = "已結束專案"
 
@@ -389,7 +385,11 @@ def set_end():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
-        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":True})
+        if(post_data.get("state") == "end"):
+            state = True
+        elif(post_data.get("state") == "open"):
+            state = False
+        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":state})
         session.commit()
     except Exception as e:
         response_object["status"] = "failed"
@@ -463,6 +463,25 @@ def set_type():
 
     return jsonify(response_object)
 
+@app.route("/to_trashcan", methods=["POST"])
+def trashcan():
+    response_object = {"status": "success"}
+    try:
+        post_data = request.get_json()
+        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
+        if project is None:
+            response_object["status"]="failed"
+            response_object["message"]="找不到專案"
+            return jsonify(response_object)
+        project.project_trashcan=1
+        session.commit()
+        response_object["message"] = "修改成功"
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+
+    return jsonify(response_object)
 
 @app.route("/trashcan_recover", methods=["POST"])
 def recover():
@@ -484,19 +503,15 @@ def recover():
 
     return jsonify(response_object)
 
-@app.route("/to_trashcan", methods=["POST"])
-def trashcan():
+@app.route("/permanent_delete", methods=["POST"])
+def permanent_delete():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到專案"
-            return jsonify(response_object)
-        project.project_trashcan=1
+        session.query(Project).filter(Project.id==post_data.get("project_id")).delete()
+        session.flush()
         session.commit()
-        response_object["message"] = "修改成功"
+        response_object["message"] = "永久刪除成功"
 
     except Exception as e:
         response_object["status"] = "failed"
