@@ -3,7 +3,29 @@ on:
   push:
     branches:
       - feature/*
+      - feature_API/*
 jobs:
+  unittest-on-feature:
+    if: startsWith(github.ref, 'refs/heads/feature_API') && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install pytest
+          pip install flask-unittest
+      
+      - name: Run test1
+        run: |
+          python backend/tests/test1.py
+    
   create-pull-request:
     runs-on: ubuntu-latest
     steps:
@@ -26,4 +48,5 @@ jobs:
       - name: meaningless step
         run: |
           echo ":("
+  
       
