@@ -1,9 +1,13 @@
 name: PR from dev to sit
 on:
-  workflow_run:
-    workflows: [PR for feature to dev]
+  push:
+    branches:
+      - dev
+  pull_request:
     types:
-      - completed
+      - closed
+    branches:
+      - dev
 
 jobs:
   create-pull-request:
