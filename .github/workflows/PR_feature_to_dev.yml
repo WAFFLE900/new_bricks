@@ -28,7 +28,7 @@ jobs:
           python backend/tests/*
     
   create-pull-request:
-    if: startsWith(github.ref, 'refs/heads/feature*')
+    if: startsWith(github.ref, 'refs/heads/feature')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
