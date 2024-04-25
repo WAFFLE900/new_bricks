@@ -1,8 +1,7 @@
 name: PR from dev to sit
 on:
   pull_request:
-    types:
-      - closed
+    branches: [ dev ]
 
 jobs:
   create-pull-request:
