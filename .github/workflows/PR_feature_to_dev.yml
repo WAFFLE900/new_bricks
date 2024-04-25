@@ -4,6 +4,10 @@ on:
     branches:
       - feature/*
       - feature_API/*
+  pull_request:
+    branches:
+      - dev
+
 jobs:
   unittest-on-feature:
     if: startsWith(github.ref, 'refs/heads/feature_API') && github.event_name == 'push'
@@ -27,6 +31,7 @@ jobs:
           python backend/tests/*
     
   create-pull-request:
+    if: startsWith(github.ref, 'refs/heads/feature') && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
