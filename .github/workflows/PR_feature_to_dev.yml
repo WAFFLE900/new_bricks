@@ -24,7 +24,7 @@ jobs:
       
       - name: Run test1
         run: |
-          python backend/tests/test1.py
+          python backend/tests/*
     
   create-pull-request:
     runs-on: ubuntu-latest
