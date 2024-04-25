@@ -5,11 +5,10 @@ on:
       - dev
   pull_request:
     branches:
-      -dev
+      - dev
 
 jobs:
   create-pull-request:
-    if: github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
