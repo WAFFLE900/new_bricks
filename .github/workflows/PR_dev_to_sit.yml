@@ -1,18 +1,16 @@
 name: PR from dev to sit
 on:
-  push:
-    branches:
-      - dev
   pull_request:
-    types:
-      - closed
     branches:
       - dev
+      - feature/*
 
 jobs:
   create-pull-request:
+    if: github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
     steps:
+      
       - name: Check out repository code
         uses: actions/checkout@v2
 
