@@ -40,7 +40,9 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Pull Request
-        run: gh pr merge ${{ steps.create-pull-request.outputs.pr-number }} --merge
+        run: |
+          gh pr merge ${{ steps.create-pull-request.outputs.pr-number }} --merge
+          git checkout dev
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
