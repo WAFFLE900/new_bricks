@@ -46,14 +46,14 @@ jobs:
 
   create-pull-request_sit:
     needs: create-pull-request
-    if: startsWith(github.ref, 'refs/heads/feature')
+    if: startsWith(github.ref, 'refs/heads/dev')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
       
       - name: create pull request
-        run: gh pr create -B dev -H ${{ github.REF }} --title 'Merge ${{ github.REF }} into dev' --body 'Created by Github action'
+        run: gh pr create -B sit -H ${{ github.REF }} --title 'Merge ${{ github.REF }} into sit' --body 'Created by Github action'
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
