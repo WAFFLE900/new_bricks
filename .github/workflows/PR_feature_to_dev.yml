@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v3
       
       - name: create pull request
-        run: gh pr create -B sit -H ${{ github.REF }} --title 'Merge ${{ github.REF }} into sit' --body 'Created by Github action'
+        run: gh pr create -B sit -H ${{ github.REF }} --title 'Merge ${{ github.REF }} into dev' --body 'Created by Github action'
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
