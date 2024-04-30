@@ -32,7 +32,10 @@ db_name = 'bricksdata'
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {'origins': "*"}})
+CORS(app, 
+     resources={r"/*": {'origins': "*"}},
+     expose_headers=["Authorization"]
+     )
 app.config['SECRET_KEY'] = 'secret'
 
 #連線到伺服器上的 MySQL
