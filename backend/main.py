@@ -311,44 +311,94 @@ def get_project():
     #     return data
     if post_data.get("project_status") == "normal":
         try:
-            SQL_q = session.query(Project).filter(
+            SQL_q_item = session.query(
+                Project
+            ).filter(
                 Project.user_id==post_data.get("user_id"),
                 Project.project_trashcan==0,
                 Project.project_ended==0
             ).order_by(
                 Project.project_edit_date.desc()
             ).all()
-        except Exception as e:
-            response_object["status"] = "failed"
-            response_object["message"] = "SQL 搜尋失敗"
-            print(str(e))
-            return jsonify(response_object), 404
-        data = row2dict(SQL_q)
-        response_object["items"] = data
-        response_object["message"] = "正在進行專案"
 
-    elif post_data.get("project_status") == "ended":
-        try:
-            SQL_q=session.query(Project).filter(
-                Project.user_id==post_data.get("user_id"),
-                Project.project_trashcan==0,
-                Project.project_ended==1
-            ).order_by(
-                Project.project_edit_date.desc()
+            SQL_q_user = session.query(
+                User
+            ).filter(
+                User.id==post_data.get("user_id"),
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
             return jsonify(response_object), 404
-        data = row2dict(SQL_q)
-        response_object["items"] = data
+        data = row2dict(SQL_q_item)
+        username = row2dict(SQL_q_user)
+        response_object["items"] = [{
+            'id': data[i]['id'],
+            'project_comment': data[i]['project_comment'],
+            'project_edit_date': data[i]['project_edit_date'],
+            'project_image': data[i]['project_image'],
+            'project_name': data[i]['project_name'],
+            'project_type': data[i]['project_type'],
+            'user_id': data[i]['user_id']
+        }
+        for i in range(len(data))
+        ]
+        response_object["user_name"] = [{
+            'user_name': username[i]['user_name']
+        }
+        for i in range(len(username))
+        ]
+        response_object["message"] = "正在進行專案"
+
+    elif post_data.get("project_status") == "ended":
+        try:
+            SQL_q_item = session.query(
+                Project
+            ).filter(
+                Project.user_id==post_data.get("user_id"),
+                Project.project_trashcan==0,
+                Project.project_ended==1
+            ).order_by(
+                Project.project_edit_date.desc()
+            ).all()
+
+            SQL_q_user = session.query(
+                User
+            ).filter(
+                User.id==post_data.get("user_id"),
+            ).all()
+        except Exception as e:
+            response_object["status"] = "failed"
+            response_object["message"] = "SQL 搜尋失敗"
+            print(str(e))
+            return jsonify(response_object), 404
+        data = row2dict(SQL_q_item)
+        username = row2dict(SQL_q_user)
+        response_object["items"] = [{
+            'id': data[i]['id'],
+            'project_comment': data[i]['project_comment'],
+            'project_edit_date': data[i]['project_edit_date'],
+            'project_image': data[i]['project_image'],
+            'project_name': data[i]['project_name'],
+            'project_type': data[i]['project_type'],
+            'user_id': data[i]['user_id']
+        }
+        for i in range(len(data))
+        ]
+        response_object["user_name"] = [{
+            'user_name': username[i]['user_name']
+        }
+        for i in range(len(username))
+        ]
         response_object["message"] = "已結束專案"
 
     elif post_data.get("project_status") == "trashcan":
         try:
             time_delta = datetime.now() - relativedelta(months=1)
-            in_month_SQL_data = session.query(Project).filter(
+            in_month_SQL_data = session.query(
+                Project
+            ).filter(
                 Project.user_id == post_data.get("user_id"),
                 Project.project_trashcan == 1,
                 Project.project_edit_date>=time_delta
@@ -356,25 +406,60 @@ def get_project():
                 Project.project_edit_date.desc()
             ).all()
 
-            not_in_month_SQL_data = session.query(Project).filter(
+            not_in_month_SQL_data = session.query(
+                Project
+            ).filter(
                 Project.user_id == post_data.get("user_id"),
                 Project.project_trashcan == 1,
                 Project.project_edit_date<time_delta
             ).order_by(
                 Project.project_edit_date.desc()
             ).all()
+
+            SQL_q_user = session.query(
+                User
+            ).filter(
+                User.id==post_data.get("user_id"),
+            ).all()
+
         except Exception as e:
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
             return jsonify(response_object), 404
-        print(in_month_SQL_data)
+        # print(in_month_SQL_data)
         in_month_data = row2dict(in_month_SQL_data)
         not_in_month_data = row2dict(not_in_month_SQL_data)
+        username = row2dict(SQL_q_user)
         response_object["item"] = {
-            "in_month":in_month_data,
-            "not_int_month":not_in_month_data
+            "in_month": [{
+                        'id': in_month_data[i]['id'],
+                        'project_comment': in_month_data[i]['project_comment'],
+                        'project_edit_date': in_month_data[i]['project_edit_date'],
+                        'project_image': in_month_data[i]['project_image'],
+                        'project_name': in_month_data[i]['project_name'],
+                        'project_type': in_month_data[i]['project_type'],
+                        'user_id': in_month_data[i]['user_id']
+                    }
+                    for i in range(len(in_month_data))
+                    ],
+            "not_int_month":[{
+                        'id': not_in_month_data[i]['id'],
+                        'project_comment': not_in_month_data[i]['project_comment'],
+                        'project_edit_date': not_in_month_data[i]['project_edit_date'],
+                        'project_image': not_in_month_data[i]['project_image'],
+                        'project_name': not_in_month_data[i]['project_name'],
+                        'project_type': not_in_month_data[i]['project_type'],
+                        'user_id': not_in_month_data[i]['user_id']
+                    }
+                    for i in range(len(not_in_month_data))
+                    ],
         }
+        response_object["user_name"] = [{
+            'user_name': username[i]['user_name']
+        }
+        for i in range(len(username))
+        ]
         response_object["message"] = "垃圾桶"
 
     return jsonify(response_object)
