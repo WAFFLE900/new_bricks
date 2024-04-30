@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from flask import Flask, current_app
+from flask import Flask, url_for, render_template_string, current_app
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -37,7 +37,8 @@ app.config['SECRET_KEY'] = 'secret'
 
 #連線到伺服器上的 MySQL
 db_url = f"mysql+pymysql://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
-engine = create_engine(db_url, echo=True)
+# engine = create_engine(db_url, echo=True)
+engine = create_engine(db_url, echo=False)
 Session=sessionmaker(bind=engine)
 session=Session()
 
@@ -46,11 +47,11 @@ oauth = OAuth(app)
 oauth.init_app(app)
 google_oauth = oauth.register(
     name='google', # name of this method
-    client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
-    client_secret='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',
-    access_token_url='https://www.googleapis.com/oauth2/v4/token',
+    client_id='1083338780028-1qnats3frrionef34vuiq5th6tetv8k4.apps.googleusercontent.com',
+    client_secret='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',
+    access_token_url='https://oauth2.googleapis.com/token',
     access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
     authorize_params=None,
     api_base_url='https://accounts.googleapis.com/oauth2/v3',
     client_kwargs={'scope': 'openid profile email'},
@@ -113,7 +114,7 @@ def make_JWT(user_email):
         algorithm='HS256')
     return token
 
-@app.route('/oauth_test')
+@app.route('/oauth_test', methods=['POST'])
 @auth.login_required(optional=True)
 def index():
     '''The home page'''
@@ -134,6 +135,39 @@ def greetings():
 def bricks():
     return ("Bricks專案管理實用工具讚讚!")
 
+@app.route('/frontend/google_login', methods=['GET'])
+def google_login_entry():
+    '''The function simulate the frontend URL which starts the Google OAuth2'''
+    redirect_uri = url_for('google_callback', _external=True)
+    redirect_uri = redirect_uri.replace(":5000", ":8080")
+    print(redirect_uri)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/frontend/google_callback', methods=['GET'])
+def google_callback():
+    '''
+        The function simulates the frontend URL for the redirection of Google OAuth2.
+        The response will make the browser put all the URL arguments from Google OAuth2
+        into a form and request for the backend URL /backend/google_login to login.
+    '''
+    args_dict = request.args.to_dict()
+    return render_template_string("""
+        <html>
+            <body onload="submitForm()">
+                <form id="redirectForm" action="{{ url_for('google_login') }}" method="post">
+                    {% for key, value in args_dict.items() %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                </form>
+                <script>
+                    function submitForm() {
+                        document.getElementById('redirectForm').submit();
+                    }
+                </script>
+            </body>
+        </html>
+    """, args_dict=args_dict)
 
 @app.route('/google_login', methods=['POST'])
 def google_login():
@@ -157,7 +191,8 @@ def google_login():
                         user_name = user_info['name'])
             session.add(user)
             session.commit()
-    except:
+    except Exception as e:
+        print(e)
         response_object = {
             'status':'failure',
             'message':"資料庫錯誤"
@@ -179,7 +214,13 @@ def bricks_login():
     post_data = request.get_json()
     try:
         user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        if user.user_password is None:
+        if user is None:
+            response_object = {
+                'status':'failure',
+                'message':"您的帳號不正確"
+            }
+            return jsonify(response_object)
+        elif user.user_password is None:
             response_object = {
                 'status' : "failure",
                 'message' : "請使用其他方式登入"
@@ -191,12 +232,6 @@ def bricks_login():
                 'message' : "您的密碼不正確"
             }
             return jsonify(response_object)
-    except exc.NoResultFound:
-        response_object = {
-            'status':'failure',
-            'message':"您的帳號不正確"
-        }
-        return jsonify(response_object)
     except:
         response_object = {
             'status':'failure',
