@@ -1,0 +1,28 @@
+name: PR from dev to sit
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  create-pull-request:
+    runs-on: ubuntu-latest
+    steps:
+      
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+            python-version: '3.10'
+      
+      - name: create pull request
+        run: gh pr create -B sit -H ${{ github.REF }} --title 'Merge ${{ github.REF }} into sit' --body 'Created by Github action'
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge Pull Request
+        run: gh pr merge ${{ steps.create-pull-request.outputs.pr-number }} --merge
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
