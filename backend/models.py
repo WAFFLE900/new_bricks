@@ -93,15 +93,19 @@ class ProjectSort(db.Model):
 class Record(db.Model):
     __tablename__ = 'record'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    record_name = db.Column(db.String(50), nullable=True)
-    record_date = db.Column(db.String(50), nullable=True)
-    record_department = db.Column(db.String(50), nullable=True)
-    record_attendances = db.Column(db.Integer, nullable=True)
-    record_place= db.Column(db.String(50), nullable=True)
-    record_host_name = db.Column(db.String(50), nullable=True)
+    record_name = db.Column(db.String(100), nullable=False, unique = True)
+    record_date = db.Column(db.Date, nullable=True, default = None)
+    record_department = db.Column(db.String(50), nullable=True, default = None)
+    record_place= db.Column(db.String(50), nullable=True, default = None)
+    record_attendees_name = db.Column(db.String(100), nullable=True, default = None)
+    record_absentees_name = db.Column(db.String(100), nullable=True, default = None)
+    record_recorder_name = db.Column(db.String(50), nullable=True, default = None)
+    record_trashcan = db.Column(db.Boolean, nullable=False, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    record_creation_time = db.Column(db.TIMESTAMP, nullable=False, default=func.current_timestamp())
+    record_update_time = db.Column(db.TIMESTAMP, nullable=False, default=func.current_timestamp(), onupdate=func.current_timestamp())
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    record_trashcan = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
 class SearchHistory(db.Model):
     __tablename__ = 'search_history'
@@ -116,7 +120,8 @@ class Tag(db.Model):
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     tag_name = db.Column(db.String(20), nullable=True)
-    tag_class = db.Column(db.String(5), nullable=True)
+    tag_class = db.Column(db.String(5), nullable=False)
+    tag_creation_time = db.Column(db.TIMESTAMP, nullable=False, default=func.current_timestamp())
 
     def __repr__(self):
         return f'<Tag id={self.id} tag_name={self.tag_name}>'
@@ -137,9 +142,10 @@ class TextBox(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     textBox_content = db.Column(db.String(300))
     record_id = db.Column(db.Integer, db.ForeignKey('record.id'), nullable=False)
-    
+    textBox_update_time = db.Column(db.TIMESTAMP, nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
+
     def __repr__(self):
-        return f'<TextBox id={self.id} textBox_content={self.textBox_content} record_id={self.record_id}>'
+        return f'<TextBox id={self.id} textBox_content={self.textBox_content} record_id={self.record_id} textBox_update_time={self.textBox_update_time}>'
 
 
 class User(db.Model):

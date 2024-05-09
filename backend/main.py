@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from flask import Flask, current_app
+from flask import Flask, url_for, render_template_string, current_app
 from flask_cors import CORS
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -32,12 +32,16 @@ db_name = 'bricksdata'
 
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {'origins': "*"}})
+CORS(app, 
+     resources={r"/*": {'origins': "*"}},
+     expose_headers=["Authorization"]
+     )
 app.config['SECRET_KEY'] = 'secret'
 
 #連線到伺服器上的 MySQL
 db_url = f"mysql+pymysql://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
-engine = create_engine(db_url, echo=True)
+# engine = create_engine(db_url, echo=True)
+engine = create_engine(db_url, echo=False)
 Session=sessionmaker(bind=engine)
 session=Session()
 
@@ -46,11 +50,11 @@ oauth = OAuth(app)
 oauth.init_app(app)
 google_oauth = oauth.register(
     name='google', # name of this method
-    client_id='638644428386-al4ccfos6s82t0arpr82p5gan6rcfa6d.apps.googleusercontent.com',
-    client_secret='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',
-    access_token_url='https://www.googleapis.com/oauth2/v4/token',
+    client_id='1083338780028-1qnats3frrionef34vuiq5th6tetv8k4.apps.googleusercontent.com',
+    client_secret='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',
+    access_token_url='https://oauth2.googleapis.com/token',
     access_token_params=None,
-    authorize_url='https://accounts.google.com/o/oauth2/v2/auth',
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
     authorize_params=None,
     api_base_url='https://accounts.googleapis.com/oauth2/v3',
     client_kwargs={'scope': 'openid profile email'},
@@ -113,7 +117,7 @@ def make_JWT(user_email):
         algorithm='HS256')
     return token
 
-@app.route('/oauth_test')
+@app.route('/oauth_test', methods=['POST'])
 @auth.login_required(optional=True)
 def index():
     '''The home page'''
@@ -134,6 +138,39 @@ def greetings():
 def bricks():
     return ("Bricks專案管理實用工具讚讚!")
 
+@app.route('/frontend/google_login', methods=['GET'])
+def google_login_entry():
+    '''The function simulate the frontend URL which starts the Google OAuth2'''
+    redirect_uri = url_for('google_callback', _external=True)
+    redirect_uri = redirect_uri.replace(":5000", ":8080")
+    print(redirect_uri)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+
+@app.route('/frontend/google_callback', methods=['GET'])
+def google_callback():
+    '''
+        The function simulates the frontend URL for the redirection of Google OAuth2.
+        The response will make the browser put all the URL arguments from Google OAuth2
+        into a form and request for the backend URL /backend/google_login to login.
+    '''
+    args_dict = request.args.to_dict()
+    return render_template_string("""
+        <html>
+            <body onload="submitForm()">
+                <form id="redirectForm" action="{{ url_for('google_login') }}" method="post">
+                    {% for key, value in args_dict.items() %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                </form>
+                <script>
+                    function submitForm() {
+                        document.getElementById('redirectForm').submit();
+                    }
+                </script>
+            </body>
+        </html>
+    """, args_dict=args_dict)
 
 @app.route('/google_login', methods=['POST'])
 def google_login():
@@ -141,7 +178,7 @@ def google_login():
     try:
         token = google_oauth.authorize_access_token()
     except:
-        response_object = {
+        response_object = { 
             'status':'failure',
             'message':"Google登入失敗"
         }
@@ -157,11 +194,13 @@ def google_login():
                         user_name = user_info['name'])
             session.add(user)
             session.commit()
-    except:
+    except Exception as e:
+        print(e)
         response_object = {
             'status':'failure',
             'message':"資料庫錯誤"
         }
+        session.rollback()
         return jsonify(response_object)
 
     # email and password are verified
@@ -179,7 +218,13 @@ def bricks_login():
     post_data = request.get_json()
     try:
         user=session.query(User).filter(User.user_email==post_data.get('user_email')).first()
-        if user.user_password is None:
+        if user is None:
+            response_object = {
+                'status':'failure',
+                'message':"您的帳號不正確"
+            }
+            return jsonify(response_object)
+        elif user.user_password is None:
             response_object = {
                 'status' : "failure",
                 'message' : "請使用其他方式登入"
@@ -191,17 +236,12 @@ def bricks_login():
                 'message' : "您的密碼不正確"
             }
             return jsonify(response_object)
-    except exc.NoResultFound:
-        response_object = {
-            'status':'failure',
-            'message':"您的帳號不正確"
-        }
-        return jsonify(response_object)
     except:
         response_object = {
             'status':'failure',
             'message':"資料庫錯誤"
         }
+        session.rollback()
         return jsonify(response_object)
 
     # email and password are verified
@@ -241,6 +281,7 @@ def bricks_register():
     except:
         response_object['status'] = "failure"
         response_object['message'] = "資料庫錯誤"
+        session.rollback()
         return jsonify(response_object)
 
     # The registration succeeds
@@ -278,7 +319,9 @@ def register_survey():
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = "INSERT userInfo 失敗"
+        session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
 
     conn.close()
     return jsonify(response_object)
@@ -297,62 +340,110 @@ def row2dict(SQL_data):
 def get_project():
     response_object = {"status": "success"}
     post_data = request.get_json()
-    def get_data(sql):
-        data = {}
-        for project, project_sort in sql:
-            d = {}
-            for column in project.__table__.columns:
-                d[column.name] = str(getattr(project, column.name))
-            del d['project_type']
-            d['type_id'] = project_sort.type_id
-            if project.project_type not in data.keys():
-                data[project.project_type] = []
-            data[project.project_type].append(d)
-        return data
+    # def get_data(sql):
+    #     data = {}
+    #     for project, project_sort in sql:
+    #         d = {}
+    #         for column in project.__table__.columns:
+    #             d[column.name] = str(getattr(project, column.name))
+    #         del d['project_type']
+    #         d['type_id'] = project_sort.type_id
+    #         if project.project_type not in data.keys():
+    #             data[project.project_type] = []
+    #         data[project.project_type].append(d)
+    #     return data
     if post_data.get("project_status") == "normal":
         try:
-            SQL_q = session.query(Project, ProjectSort).join(ProjectSort, Project.project_type==ProjectSort.project_type).filter(
+            SQL_q_item = session.query(
+                Project
+            ).filter(
                 Project.user_id==post_data.get("user_id"),
                 Project.project_trashcan==0,
-                Project.project_ended==0,
-                ProjectSort.user_id==post_data.get("user_id")
+                Project.project_ended==0
             ).order_by(
-                ProjectSort.project_type_sort.asc(),
                 Project.project_edit_date.desc()
+            ).all()
+
+            SQL_q_user = session.query(
+                User
+            ).filter(
+                User.id==post_data.get("user_id"),
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
+            session.rollback()
             return jsonify(response_object), 404
-        data = get_data(SQL_q)
-        response_object["items"] = data
+        data = row2dict(SQL_q_item)
+        username = row2dict(SQL_q_user)
+        response_object["items"] = [{
+            'id': data[i]['id'],
+            'project_comment': data[i]['project_comment'],
+            'project_edit_date': data[i]['project_edit_date'],
+            'project_image': data[i]['project_image'],
+            'project_name': data[i]['project_name'],
+            'project_type': data[i]['project_type'],
+            'user_id': data[i]['user_id']
+        }
+        for i in range(len(data))
+        ]
+        response_object["user_name"] = [{
+            'user_name': username[i]['user_name']
+        }
+        for i in range(len(username))
+        ]
         response_object["message"] = "正在進行專案"
 
     elif post_data.get("project_status") == "ended":
         try:
-            SQL_q=session.query(Project, ProjectSort).join(ProjectSort,Project.project_type==ProjectSort.project_type).filter(
+            SQL_q_item = session.query(
+                Project
+            ).filter(
                 Project.user_id==post_data.get("user_id"),
                 Project.project_trashcan==0,
-                Project.project_ended==1,
-                ProjectSort.user_id==post_data.get("user_id")
+                Project.project_ended==1
             ).order_by(
-                ProjectSort.project_type_sort.asc(),
                 Project.project_edit_date.desc()
+            ).all()
+
+            SQL_q_user = session.query(
+                User
+            ).filter(
+                User.id==post_data.get("user_id"),
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
+            session.rollback()
             return jsonify(response_object), 404
-        data = get_data(SQL_q)
-        response_object["items"] = data
+        data = row2dict(SQL_q_item)
+        username = row2dict(SQL_q_user)
+        response_object["items"] = [{
+            'id': data[i]['id'],
+            'project_comment': data[i]['project_comment'],
+            'project_edit_date': data[i]['project_edit_date'],
+            'project_image': data[i]['project_image'],
+            'project_name': data[i]['project_name'],
+            'project_type': data[i]['project_type'],
+            'user_id': data[i]['user_id']
+        }
+        for i in range(len(data))
+        ]
+        response_object["user_name"] = [{
+            'user_name': username[i]['user_name']
+        }
+        for i in range(len(username))
+        ]
         response_object["message"] = "已結束專案"
 
     elif post_data.get("project_status") == "trashcan":
         try:
             time_delta = datetime.now() - relativedelta(months=1)
-            in_month_SQL_data = session.query(Project).filter(
+            in_month_SQL_data = session.query(
+                Project
+            ).filter(
                 Project.user_id == post_data.get("user_id"),
                 Project.project_trashcan == 1,
                 Project.project_edit_date>=time_delta
@@ -360,25 +451,61 @@ def get_project():
                 Project.project_edit_date.desc()
             ).all()
 
-            not_in_month_SQL_data = session.query(Project).filter(
+            not_in_month_SQL_data = session.query(
+                Project
+            ).filter(
                 Project.user_id == post_data.get("user_id"),
                 Project.project_trashcan == 1,
                 Project.project_edit_date<time_delta
             ).order_by(
                 Project.project_edit_date.desc()
             ).all()
+
+            SQL_q_user = session.query(
+                User
+            ).filter(
+                User.id==post_data.get("user_id"),
+            ).all()
+
         except Exception as e:
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
+            session.rollback()
             return jsonify(response_object), 404
-        print(in_month_SQL_data)
+        # print(in_month_SQL_data)
         in_month_data = row2dict(in_month_SQL_data)
         not_in_month_data = row2dict(not_in_month_SQL_data)
+        username = row2dict(SQL_q_user)
         response_object["item"] = {
-            "in_month":in_month_data,
-            "not_int_month":not_in_month_data
+            "in_month": [{
+                        'id': in_month_data[i]['id'],
+                        'project_comment': in_month_data[i]['project_comment'],
+                        'project_edit_date': in_month_data[i]['project_edit_date'],
+                        'project_image': in_month_data[i]['project_image'],
+                        'project_name': in_month_data[i]['project_name'],
+                        'project_type': in_month_data[i]['project_type'],
+                        'user_id': in_month_data[i]['user_id']
+                    }
+                    for i in range(len(in_month_data))
+                    ],
+            "not_int_month":[{
+                        'id': not_in_month_data[i]['id'],
+                        'project_comment': not_in_month_data[i]['project_comment'],
+                        'project_edit_date': not_in_month_data[i]['project_edit_date'],
+                        'project_image': not_in_month_data[i]['project_image'],
+                        'project_name': not_in_month_data[i]['project_name'],
+                        'project_type': not_in_month_data[i]['project_type'],
+                        'user_id': not_in_month_data[i]['user_id']
+                    }
+                    for i in range(len(not_in_month_data))
+                    ],
         }
+        response_object["user_name"] = [{
+            'user_name': username[i]['user_name']
+        }
+        for i in range(len(username))
+        ]
         response_object["message"] = "垃圾桶"
 
     return jsonify(response_object)
@@ -389,12 +516,17 @@ def set_end():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
-        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":True})
+        if(post_data.get("state") == "end"):
+            state = True
+        elif(post_data.get("state") == "open"):
+            state = False
+        session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":state})
         session.commit()
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = "SQL 搜尋失敗，找不到專案"
         print(str(e))
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "修改成功"
     return jsonify(response_object)
@@ -419,7 +551,9 @@ def add_project():
         response_object["status"] = "failed"
         response_object["message"] = "新增失敗"
         print(str(e))
+        session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "新增{}成功".format(post_data.get("project_name"))
     return jsonify(response_object)
@@ -437,7 +571,9 @@ def add_type():
         response_object["status"] = "failed"
         response_object["message"] = "新增失敗"
         print(str(e))
+        session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "新增{}成功".format(post_data.get("project_type"))
     return jsonify(response_object)
@@ -452,35 +588,18 @@ def set_type():
             response_object["status"] = "failed"
             response_object["message"] = "輸入類別名稱錯誤"
             return jsonify(response_object)
+        if post_data.get("project_type") == None:
+            response_object["message"] = "類別名稱未修改"
+            return jsonify(response_object)
         session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).update({"project_type": post_data.get("project_type")})
-
         session.commit()
         response_object["message"] = f"{post_data.get('old_project_type')}成功修改成{post_data.get('project_type')}"
 
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
-
-    return jsonify(response_object)
-
-
-@app.route("/trashcan_recover", methods=["POST"])
-def recover():
-    response_object = {"status": "success"}
-    try:
-        post_data = request.get_json()
-        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
-        if project is None:
-            response_object["status"]="failed"
-            response_object["message"]="找不到專案"
-            return jsonify(response_object)
-        project.project_trashcan=0
-        session.commit()
-        response_object["message"] = "修改成功"
-
-    except Exception as e:
-        response_object["status"] = "failed"
-        response_object["message"] = str(e)
+        print(e)
+        session.rollback()
 
     return jsonify(response_object)
 
@@ -501,6 +620,45 @@ def trashcan():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+
+    return jsonify(response_object)
+
+@app.route("/trashcan_recover", methods=["POST"])
+def recover():
+    response_object = {"status": "success"}
+    try:
+        post_data = request.get_json()
+        project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
+        if project is None:
+            response_object["status"]="failed"
+            response_object["message"]="找不到專案"
+            return jsonify(response_object)
+        project.project_trashcan=0
+        session.commit()
+        response_object["message"] = "修改成功"
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+        session.rollback()
+
+    return jsonify(response_object)
+
+@app.route("/permanent_delete", methods=["POST"])
+def permanent_delete():
+    response_object = {"status": "success"}
+    try:
+        post_data = request.get_json()
+        session.query(Project).filter(Project.id==post_data.get("project_id")).delete()
+        session.flush()
+        session.commit()
+        response_object["message"] = "永久刪除成功"
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+        session.rollback()
 
     return jsonify(response_object)
 
@@ -541,6 +699,7 @@ def search():
     except Exception as e:
         response_object['status'] = "failure"
         print(str(e))
+        session.rollback()
 
     response_object['items'] = sorted_rank
     return jsonify(response_object)
@@ -575,6 +734,7 @@ def tag_index():
         response_object["message"] = "標籤回傳失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -682,6 +842,7 @@ def tag_search():
         response_object["message"] = "標籤回傳失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -742,6 +903,7 @@ def add_tag():
         response_object["message"] = "新增失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -767,6 +929,7 @@ def delete_tag():
         response_object["message"] = "標籤尋找失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -807,6 +970,7 @@ def delete_texBox():
         response_object["message"] = "文字方塊刪除失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -826,6 +990,7 @@ def trashcan_record():
         response_object["message"] = "垃圾桶顯示失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -853,6 +1018,7 @@ def add_record():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "新增成功"
     response_object["record_id"] = new_record.id
@@ -887,6 +1053,8 @@ def get_record_index():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -908,6 +1076,8 @@ def edit_record():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -930,7 +1100,8 @@ def delete_record():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
-
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -964,6 +1135,8 @@ def get_record():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -980,6 +1153,8 @@ def add_textBox():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
     response_object["message"] = f"新增[{post_data.get('textBox_content')}] 進 record[{post_data.get('record_id')}]成功"
     return jsonify(response_object)   
 
@@ -996,6 +1171,8 @@ def edit_textBox():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
     response_object["message"] = f"修改 textBox[{post_data.get('textBox_id')}] 的內容成[{post_data.get('textBox_content')}]成功"
     return jsonify(response_object)
 
@@ -1016,8 +1193,8 @@ def recover_record():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
-
-
+        session.rollback()
+        return jsonify(response_object)
     return jsonify(response_object)
 
 
@@ -1039,7 +1216,18 @@ def delete_record_permanent():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
+    return jsonify(response_object)
 
+@app.route('/rollback', methods=['POST'])
+def rollback():
+    try:
+        response_object = {"status": "success"}
+        session.rollback()
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
     return jsonify(response_object)
 
 if __name__ == "__main__":
