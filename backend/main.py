@@ -200,6 +200,7 @@ def google_login():
             'status':'failure',
             'message':"資料庫錯誤"
         }
+        session.rollback()
         return jsonify(response_object)
 
     # email and password are verified
@@ -240,6 +241,7 @@ def bricks_login():
             'status':'failure',
             'message':"資料庫錯誤"
         }
+        session.rollback()
         return jsonify(response_object)
 
     # email and password are verified
@@ -279,6 +281,7 @@ def bricks_register():
     except:
         response_object['status'] = "failure"
         response_object['message'] = "資料庫錯誤"
+        session.rollback()
         return jsonify(response_object)
 
     # The registration succeeds
@@ -316,7 +319,9 @@ def register_survey():
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = "INSERT userInfo 失敗"
+        session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
 
     conn.close()
     return jsonify(response_object)
@@ -368,6 +373,7 @@ def get_project():
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
+            session.rollback()
             return jsonify(response_object), 404
         data = row2dict(SQL_q_item)
         username = row2dict(SQL_q_user)
@@ -410,6 +416,7 @@ def get_project():
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
+            session.rollback()
             return jsonify(response_object), 404
         data = row2dict(SQL_q_item)
         username = row2dict(SQL_q_user)
@@ -464,6 +471,7 @@ def get_project():
             response_object["status"] = "failed"
             response_object["message"] = "SQL 搜尋失敗"
             print(str(e))
+            session.rollback()
             return jsonify(response_object), 404
         # print(in_month_SQL_data)
         in_month_data = row2dict(in_month_SQL_data)
@@ -518,6 +526,7 @@ def set_end():
         response_object["status"] = "failed"
         response_object["message"] = "SQL 搜尋失敗，找不到專案"
         print(str(e))
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "修改成功"
     return jsonify(response_object)
@@ -542,7 +551,9 @@ def add_project():
         response_object["status"] = "failed"
         response_object["message"] = "新增失敗"
         print(str(e))
+        session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "新增{}成功".format(post_data.get("project_name"))
     return jsonify(response_object)
@@ -560,7 +571,9 @@ def add_type():
         response_object["status"] = "failed"
         response_object["message"] = "新增失敗"
         print(str(e))
+        session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "新增{}成功".format(post_data.get("project_type"))
     return jsonify(response_object)
@@ -575,14 +588,18 @@ def set_type():
             response_object["status"] = "failed"
             response_object["message"] = "輸入類別名稱錯誤"
             return jsonify(response_object)
+        if post_data.get("project_type") == None:
+            response_object["message"] = "類別名稱未修改"
+            return jsonify(response_object)
         session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).update({"project_type": post_data.get("project_type")})
-
         session.commit()
         response_object["message"] = f"{post_data.get('old_project_type')}成功修改成{post_data.get('project_type')}"
 
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        print(e)
+        session.rollback()
 
     return jsonify(response_object)
 
@@ -603,6 +620,7 @@ def trashcan():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
 
     return jsonify(response_object)
 
@@ -623,6 +641,7 @@ def recover():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
 
     return jsonify(response_object)
 
@@ -639,6 +658,7 @@ def permanent_delete():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
 
     return jsonify(response_object)
 
@@ -679,6 +699,7 @@ def search():
     except Exception as e:
         response_object['status'] = "failure"
         print(str(e))
+        session.rollback()
 
     response_object['items'] = sorted_rank
     return jsonify(response_object)
@@ -713,6 +734,7 @@ def tag_index():
         response_object["message"] = "標籤回傳失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -820,6 +842,7 @@ def tag_search():
         response_object["message"] = "標籤回傳失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -880,6 +903,7 @@ def add_tag():
         response_object["message"] = "新增失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -905,6 +929,7 @@ def delete_tag():
         response_object["message"] = "標籤尋找失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -945,6 +970,7 @@ def delete_texBox():
         response_object["message"] = "文字方塊刪除失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -964,6 +990,7 @@ def trashcan_record():
         response_object["message"] = "垃圾桶顯示失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object)
     return jsonify(response_object)
 
@@ -991,6 +1018,7 @@ def add_record():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         logging.exception('Error at %s', 'division', exc_info=e)
+        session.rollback()
         return jsonify(response_object), 404
     response_object["message"] = "新增成功"
     response_object["record_id"] = new_record.id
@@ -1025,6 +1053,8 @@ def get_record_index():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -1046,6 +1076,8 @@ def edit_record():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -1068,7 +1100,8 @@ def delete_record():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
-
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -1102,6 +1135,8 @@ def get_record():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
 
     return jsonify(response_object)
 
@@ -1118,6 +1153,8 @@ def add_textBox():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
     response_object["message"] = f"新增[{post_data.get('textBox_content')}] 進 record[{post_data.get('record_id')}]成功"
     return jsonify(response_object)   
 
@@ -1134,6 +1171,8 @@ def edit_textBox():
         print(str(e))
         response_object["status"] = "failed"
         response_object["message"] = str(e)
+        session.rollback()
+        return jsonify(response_object)
     response_object["message"] = f"修改 textBox[{post_data.get('textBox_id')}] 的內容成[{post_data.get('textBox_content')}]成功"
     return jsonify(response_object)
 
@@ -1154,8 +1193,8 @@ def recover_record():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
-
-
+        session.rollback()
+        return jsonify(response_object)
     return jsonify(response_object)
 
 
@@ -1177,7 +1216,8 @@ def delete_record_permanent():
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = str(e)
-
+        session.rollback()
+        return jsonify(response_object)
     return jsonify(response_object)
 
 @app.route('/rollback', methods=['POST'])
