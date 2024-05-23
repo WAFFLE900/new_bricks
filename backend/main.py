@@ -250,6 +250,7 @@ def bricks_login():
     response = jsonify(response_object)
     token = make_JWT(post_data.get("user_email")) # issue a JWT token as authorization
     response.headers['Authorization'] = f"Bearer {token}"
+    print(token)
     return response
 
 
@@ -735,8 +736,8 @@ def tag_index():
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         session.rollback()
-        return jsonify(response_object)
-    return jsonify(response_object)
+        return jsonify(response_object),400
+    return jsonify(response_object),400
 
 # 標籤搜尋
 @app.route('/tag_search', methods=['POST'])
@@ -843,8 +844,8 @@ def tag_search():
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         session.rollback()
-        return jsonify(response_object)
-    return jsonify(response_object)
+        return jsonify(response_object),400
+    return jsonify(response_object),400
 
 # 新增標籤
 @app.route('/add_tag', methods=['POST'])
@@ -930,8 +931,8 @@ def delete_tag():
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         session.rollback()
-        return jsonify(response_object)
-    return jsonify(response_object)
+        return jsonify(response_object),400
+    return jsonify(response_object),400
 
 # 刪除文字方塊
 @app.route('/delete_textBox', methods=['POST'])
@@ -971,8 +972,8 @@ def delete_texBox():
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         session.rollback()
-        return jsonify(response_object)
-    return jsonify(response_object)
+        return jsonify(response_object),400
+    return jsonify(response_object),400
 
 # 顯示垃圾桶中會議記錄
 @app.route('/trashcan_record', methods=['POST'])
@@ -1022,7 +1023,7 @@ def add_record():
         return jsonify(response_object), 404
     response_object["message"] = "新增成功"
     response_object["record_id"] = new_record.id
-    return jsonify(response_object)
+    return jsonify(response_object),400
 
 
 @app.route('/get_record_index', methods=['GET'])
@@ -1031,21 +1032,20 @@ def get_record_index():
     post_data = request.get_json()
     try:
         response_object["record"] = []
-        record_get = session.query(Record).join(Project, Record.project_id == Project.id).filter(Project.id == post_data.get("project_id")).filter(Record.record_trashcan == False)
+        record_get = session.query(Record).join(Project, Record.project_id == Project.id).filter(Project.id == post_data.get("project_id")).filter(Record.record_trashcan == False).all()
         for records in record_get:
-            tag_get = session.query(Tag).join(TagTextBox, Tag.id == TagTextBox.tag_id).join(TextBox, TagTextBox.textBox_id == TextBox.id).join(Record, TextBox.record_id == Record.id).filter(TextBox.record_id == str(getattr(records, "id")))
+            tag_get = session.query(Tag).join(TagTextBox, Tag.id == TagTextBox.tag_id).join(TextBox, TagTextBox.textBox_id == TextBox.id).join(Record, TextBox.record_id == Record.id).filter(TextBox.record_id == str(getattr(records, "id"))).all()
             
             return_tags = []
             for tags in tag_get:
                 return_tags.append(str(getattr(tags, "tag_name")))
-
 
             response_object["record"].append({'record_name':str(getattr(records, "record_name")),
                                               'record_date':str(getattr(records, "record_date")),
                                               'record_department':str(getattr(records, "record_department")),
                                               'record_attendances':str(getattr(records, "record_attendances")),
                                               'record_place':str(getattr(records, "record_place")),
-                                              'record_host_name':str(getattr(records, "record_place")),
+                                              'record_host_name':str(getattr(records, "record_host_name")),
                                               'tags':return_tags
                                               })
 
@@ -1056,7 +1056,7 @@ def get_record_index():
         session.rollback()
         return jsonify(response_object)
 
-    return jsonify(response_object)
+    return jsonify(response_object),400
 
 
 @app.route('/edit_record', methods=['POST'])
@@ -1077,13 +1077,14 @@ def edit_record():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         session.rollback()
-        return jsonify(response_object)
+        return jsonify(response_object),400
 
-    return jsonify(response_object)
+    return jsonify(response_object),400
 
 
 @app.route('/delete_record', methods=['POST'])
 def delete_record():
+    print("debug")
     response_object = {"status": "success"}
     post_data = request.get_json()
     try:
@@ -1101,9 +1102,9 @@ def delete_record():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         session.rollback()
-        return jsonify(response_object)
+        return jsonify(response_object),400
 
-    return jsonify(response_object)
+    return jsonify(response_object),400
 
 @app.route('/get_record', methods=['POST'])
 def get_record():
@@ -1156,7 +1157,7 @@ def add_textBox():
         session.rollback()
         return jsonify(response_object)
     response_object["message"] = f"新增[{post_data.get('textBox_content')}] 進 record[{post_data.get('record_id')}]成功"
-    return jsonify(response_object)   
+    return jsonify(response_object) ,400
 
 @app.route('/edit_textBox', methods=['POST'])
 def edit_textBox():
@@ -1172,9 +1173,9 @@ def edit_textBox():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         session.rollback()
-        return jsonify(response_object)
+        return jsonify(response_object),400
     response_object["message"] = f"修改 textBox[{post_data.get('textBox_id')}] 的內容成[{post_data.get('textBox_content')}]成功"
-    return jsonify(response_object)
+    return jsonify(response_object),400
 
 @app.route('/recover_record', methods=['POST'])
 def recover_record():
@@ -1194,8 +1195,8 @@ def recover_record():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         session.rollback()
-        return jsonify(response_object)
-    return jsonify(response_object)
+        return jsonify(response_object),400
+    return jsonify(response_object),400
 
 
 @app.route('/delete_record_permanent', methods=['POST'])
@@ -1217,8 +1218,8 @@ def delete_record_permanent():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         session.rollback()
-        return jsonify(response_object)
-    return jsonify(response_object)
+        return jsonify(response_object),400
+    return jsonify(response_object),400
 
 @app.route('/rollback', methods=['POST'])
 def rollback():
