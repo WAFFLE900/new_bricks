@@ -2,8 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_app import GlobalObjects
 from flask_app.models import *
 from flask_app.auth import make_JWT, hash_password
-from sqlalchemy.orm import *
-from sqlalchemy import *
+from sqlalchemy import exists, func
 import logging
 
 bp = Blueprint('meeting_records', __name__)
@@ -26,7 +25,7 @@ def tag_index():
     try:
         id = post_data.get('project_id')
         result = (
-            session.query(Tag.tag_class, func.group_concat(func.DISTINCT(Tag.tag_name)).label('tag_names'))
+            GlobalObjects.db_session.query(Tag.tag_class, func.group_concat(func.DISTINCT(Tag.tag_name)).label('tag_names'))
             .select_from(Project)
             .join(Record, Project.id == Record.project_id)
             .join(TextBox, Record.id == TextBox.record_id)
@@ -46,6 +45,6 @@ def tag_index():
         response_object["message"] = "標籤回傳失敗"
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
-        session.rollback()
+        GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
     return jsonify(response_object),400

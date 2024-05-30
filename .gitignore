@@ -25,3 +25,5 @@ pnpm-debug.log*
 .vscode
 
 __pycache__/
+
+uwsgi.ini
