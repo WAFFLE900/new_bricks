@@ -74,11 +74,16 @@ def verify_token(token):
         data = jwt.decode(token,
                           app.config['SECRET_KEY'],
                           algorithms=['HS256'])
-    except:
+    except jwt.ExpiredSignatureError:
+        print("Token has expired")
+        return False
+    except jwt.InvalidTokenError:
+        print("Invalid token")
         return False
 
     if time() > data['exp']:
         # the JWT is expired
+        print("Token is expired")
         return False
     
     user = session.query(User).filter(User.user_email==data['user_email']).first()
@@ -94,6 +99,8 @@ def auth_error(status):
     }
     if status == 403:
         response_object['message'] = "Permission Denied"
+    if status == 401:
+        response_object['message'] = "Invalid Token or Token Expired"
     return jsonify(response_object), status
 
 
@@ -707,11 +714,19 @@ def search():
 
 # 回傳所有標籤
 @app.route('/tag_index', methods=['POST'])
-@auth.login_required()
+#@auth.login_required()
 def tag_index():
     response_object = {'status': 'success'}
     post_data = request.get_json()
-    user = auth.current_user()
+    project_id = post_data.get("project_id")
+    #user = auth.current_user()
+
+    project_exists = session.query(exists().where(Project.id == project_id)).scalar()
+    if not project_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '專案不存在'
+        return jsonify(response_object), 400
+    
     try:
         id = post_data.get('project_id')
         result = (
@@ -721,7 +736,8 @@ def tag_index():
             .join(TextBox, Record.id == TextBox.record_id)
             .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
             .join(Tag, TagTextBox.tag_id == Tag.id)
-            .filter(Project.id == id, User.user_email == user.user_email)
+            #.filter(Project.id == id, User.user_email == user.user_email)
+            .filter(Project.id == id, User.user_email =="bricksBE@gmail.com")
             .group_by(Tag.tag_class)
             .distinct()
             .all()
@@ -741,15 +757,21 @@ def tag_index():
 
 # 標籤搜尋
 @app.route('/tag_search', methods=['POST'])
-@auth.login_required()
+#@auth.login_required()
 def tag_search():
     response_object = {'status': 'success'}
     try:
         post_data = request.get_json()
         id = request.get_json().get("project_id")
-        user = auth.current_user()
+        #user = auth.current_user()
         print("project_id: ", id)
-        print("user_email: ", user.user_email)
+        #print("user_email: ", user.user_email)
+
+        project_exists = session.query(exists().where(Project.id == id)).scalar()
+        if not project_exists:
+            response_object['status'] = 'failed'
+            response_object['message'] = '專案不存在'
+            return jsonify(response_object), 400
 
         date_projects = (
             session.query(
@@ -772,7 +794,8 @@ def tag_search():
             .join(TextBox, Record.id == TextBox.record_id)
             .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
             .join(Tag, TagTextBox.tag_id == Tag.id)
-            .filter(Project.id == id, User.user_email == user.user_email)
+            #.filter(Project.id == id, User.user_email == user.user_email)
+            .filter(Project.id == id, User.user_email == "bricksBE@gmail.com")
             .filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
             .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
             .order_by(desc(func.count(Tag.id)))
@@ -815,7 +838,8 @@ def tag_search():
             .order_by(desc(func.count(Tag.id)))
             .all()
         )
-        print(undate_projects)
+        print("undate_project: ",undate_projects)
+
         response_object["item"] = {
             "match": [
                 {
@@ -849,23 +873,33 @@ def tag_search():
 
 # 新增標籤
 @app.route('/add_tag', methods=['POST'])
-@auth.login_required()
+#@auth.login_required()
 def add_tag():
     response_object = {"status": "success"}
+    post_data = request.get_json()
+
+    textbox_id=post_data.get("textBox_id")
+    textbox_exists = session.query(exists().where(TextBox.id == textbox_id)).scalar()
+    if not textbox_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '文字方框不存在'
+        return jsonify(response_object), 400
+    
     try:
-        post_data = request.get_json()
-        textBox_id = post_data.get("textBox_id")
+        '''
         user = auth.current_user()
         print("textBox_id: ", textBox_id)
         print("user_email: ", user.user_email)
+        '''
         project_id = (
             session.query(Project.id)
             .select_from(User)
             .join(Project, User.id == Project.user_id)
             .join(Record, Project.id == Record.project_id)
             .join(TextBox, Record.id == TextBox.record_id)
-            .filter(TextBox.id == textBox_id)
-            .filter(User.user_email == user.user_email)
+            .filter(TextBox.id == textbox_id)
+            #.filter(User.user_email == user.user_email)
+            .filter(User.user_email == "bricksBE@gmail.com")
             .scalar()
         )
         tag = (
@@ -921,7 +955,7 @@ def delete_tag():
         else:
             session.query(TagTextBox).filter(TagTextBox.tag_id == post_data.get("tag_id")).delete()
             session.flush()
-            session.query(Tag).filter(Tag.id==post_data.get("id")).delete()
+            session.query(Tag).filter(Tag.id==post_data.get("tag_id")).delete()
             session.flush()
             session.commit()
             response_object["message"] = "刪除標籤{}成功".format(post_data.get("tag_id"))
@@ -938,8 +972,16 @@ def delete_tag():
 @app.route('/delete_textBox', methods=['POST'])
 def delete_texBox():
     response_object = {'status': 'success'}
+    post_data = request.get_json()
+
+    textbox_id=post_data.get("textBox_id")
+    textbox_exists = session.query(exists().where(TextBox.id == textbox_id)).scalar()
+    if not textbox_exists:
+        response_object['status'] = 'success'
+        response_object['message'] = '文字方框不存在'
+        return jsonify(response_object), 400
+    
     try:
-        post_data = request.get_json()
         tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
         if not tag_textboxs:
             response_object["message"] = "此文字方塊無標籤"
@@ -996,19 +1038,36 @@ def trashcan_record():
     return jsonify(response_object)
 
 @app.route('/add_record', methods=['POST'])
+#@auth.login_required
 def add_record():
     response_object = {'status': 'success'}
     post_data = request.get_json()
+    #user = auth.current_user()
+    project_id = post_data.get("project_id")
+    record_name=post_data.get("record_name")
+
+    project_exists = session.query(exists().where(Project.id == project_id)).scalar()
+    if not project_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '專案不存在'
+        return jsonify(response_object), 400
+    record_exists = session.query(exists().where(Record.record_name == record_name)).scalar()
+    if record_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '會議記錄已存在'
+        return jsonify(response_object), 400
+
     try:
         print(session.query(User).all())
         new_record = Record(record_name=post_data.get("record_name"),
                             record_date=post_data.get("record_date"),
                             record_department=post_data.get("record_department"),
-                            record_attendances=post_data.get("record_attendances"),
+                            # record_attendances=post_data.get("record_attendances"),
                             record_place=post_data.get("record_place"),
-                            record_host_name=post_data.get("record_host_name"),
+                            # record_host_name=post_data.get("record_host_name"),
                             record_trashcan=False,
-                            user_id="34",
+                            #user_id=user.id,
+                            user_id=25,
                             project_id=post_data.get("project_id"))
         session.add(new_record)
         session.flush()
@@ -1026,7 +1085,7 @@ def add_record():
     return jsonify(response_object),400
 
 
-@app.route('/get_record_index', methods=['GET'])
+@app.route('/get_record_index', methods=['POST'])
 def get_record_index():
     response_object = {'status': 'success'}
     post_data = request.get_json()
@@ -1043,9 +1102,10 @@ def get_record_index():
             response_object["record"].append({'record_name':str(getattr(records, "record_name")),
                                               'record_date':str(getattr(records, "record_date")),
                                               'record_department':str(getattr(records, "record_department")),
-                                              'record_attendances':str(getattr(records, "record_attendances")),
+                                              #'record_attendances':str(getattr(records, "record_attendances")),
                                               'record_place':str(getattr(records, "record_place")),
-                                              'record_host_name':str(getattr(records, "record_host_name")),
+                                              'record_attendees_name':str(getattr(records,"record_attendees_name")),
+                                              #'record_host_name':str(getattr(records, "record_host_name")),
                                               'tags':return_tags
                                               })
 
@@ -1063,11 +1123,19 @@ def get_record_index():
 def edit_record():
     response_object = {"status": "success"}
     post_data = request.get_json()
+
+    record_id=post_data.get("record_id")
+    record_exists = session.query(exists().where(Record.id == record_id)).scalar()
+    if not record_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '會議記錄不存在'
+        return jsonify(response_object), 400
+    
     try:
         session.query(Record).filter(Record.id == post_data.get("record_id")).update({
             "record_name": post_data.get("record_name"),
             "record_department": post_data.get("record_department"),
-            "record_attendances": post_data.get("record_attendances"),
+            #"record_attendances": post_data.get("record_attendances"),
             "record_place": post_data.get("record_place")
         })
         session.commit()
@@ -1145,6 +1213,14 @@ def get_record():
 def add_textBox():
     response_object = {'status': 'success'}
     post_data = request.get_json()
+
+    record_id=post_data.get("record_id")
+    record_exists = session.query(exists().where(Record.id == record_id)).scalar()
+    if not record_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '會議記錄不存在'
+        return jsonify(response_object), 400
+    
     try:        
         textBox = TextBox(textBox_content = post_data.get("textBox_content"),
                     record_id = post_data.get("record_id"))
@@ -1163,6 +1239,14 @@ def add_textBox():
 def edit_textBox():
     response_object = {'status': 'success'}
     post_data = request.get_json()
+
+    textbox_id=post_data.get("textBox_id")
+    textbox_exists = session.query(exists().where(TextBox.id == textbox_id)).scalar()
+    if not textbox_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '文字方框不存在'
+        return jsonify(response_object), 400
+    
     try:        
         session.query(TextBox).filter(TextBox.id == post_data.get("textBox_id")).update({
             "textBox_content": post_data.get("textBox_content")
