@@ -26,7 +26,7 @@ load_dotenv()
 
 db_username = 'bricks'
 db_password = 'NCCUgdsc1234!'
-db_host = '104.199.143.218'
+db_host = '34.81.219.139'
 db_port = '3306'
 db_name = 'bricksdata'
 
