@@ -26,7 +26,7 @@ load_dotenv()
 
 db_username = 'bricks'
 db_password = 'NCCUgdsc1234!'
-db_host = '104.199.143.218'
+db_host = '34.81.219.139'
 db_port = '3306'
 db_name = 'bricksdata'
 
@@ -998,8 +998,11 @@ def delete_texBox():
     
     try:
         user_owns_textBox = (
-            session.query(exists().where(TextBox.id == textbox_id, Record.user_id == user.id))
+            session.query(exists().where(TextBox.id == textBox_id))
+            .select_from(TextBox)
             .join(Record, TextBox.record_id == Record.id)
+            .join(Project, Record.project_id == Project.id)
+            .filter(Project.user_id == user.id)
             .scalar()
         )
         if not user_owns_textBox:
@@ -1121,11 +1124,12 @@ def get_record_index():
         record_get = (
             session.query(Record)
             .join(Project, Record.project_id == Project.id)
-            .filter(Project.user_id==user.id)
-            .filter(Project.id == post_data.get("project_id"))
+            .filter(Project.user_id==user.id, Project.id == post_data.get("project_id"))
             .filter(Record.record_trashcan == False)
             .all()
         )
+        print("user_id: ", user.id)
+        print("record_get: ", record_get)
         for records in record_get:
             tag_get = session.query(Tag).join(TagTextBox, Tag.id == TagTextBox.tag_id).join(TextBox, TagTextBox.textBox_id == TextBox.id).join(Record, TextBox.record_id == Record.id).filter(TextBox.record_id == str(getattr(records, "id"))).all()
             
@@ -1295,8 +1299,11 @@ def edit_textBox():
     
     try:
         user_owns_textBox = (
-            session.query(exists().where(TextBox.id == textbox_id, Record.user_id == user.id))
+            session.query(exists().where(TextBox.id == textbox_id))
+            .select_from(TextBox)
             .join(Record, TextBox.record_id == Record.id)
+            .join(Project, Record.project_id == Project.id)
+            .filter(Project.user_id == user.id)
             .scalar()
         )
         if not user_owns_textBox:
