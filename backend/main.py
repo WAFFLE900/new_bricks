@@ -940,16 +940,35 @@ def add_tag():
 @auth.login_required()
 def delete_tag():
     response_object = {'status': 'success'}
+    post_data = request.get_json()
+    user = auth.current_user()
     try:
-        post_data = request.get_json()
-        dTag = session.query(Tag).filter(Tag.id==post_data.get("tag_id")).first()
-        print(dTag)
+        tag_id = post_data.get("tag_id")
+        dTag = session.query(Tag).filter(Tag.id==tag_id).first()
+        print("tag to delete: ", dTag)
         if dTag is None:
             response_object["message"] = "標籤不存在"
         else:
-            session.query(TagTextBox).filter(TagTextBox.tag_id == post_data.get("tag_id")).delete()
+            # 把所有table連起來判斷user_id
+            project_id = (
+                session.query(Project.id)
+                .select_from(User)
+                .join(Project, User.id == Project.user_id)
+                .join(Record, Project.id == Record.project_id)
+                .join(TextBox, Record.id == TextBox.record_id)
+                .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+                .join(Tag, TagTextBox.tag_id == Tag.id)
+                .filter(Tag.id == tag_id)
+                .filter(User.id == user.id)
+                .scalar()
+            )
+            if project_id is None:
+                response_object['message'] = "user不擁有此標籤，無法刪除"
+                return jsonify(response_object),403
+            
+            session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id).delete()
             session.flush()
-            session.query(Tag).filter(Tag.id==post_data.get("tag_id")).delete()
+            session.query(Tag).filter(Tag.id==tag_id).delete()
             session.flush()
             session.commit()
             response_object["message"] = "刪除標籤{}成功".format(post_data.get("tag_id"))
@@ -959,7 +978,7 @@ def delete_tag():
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         session.rollback()
-        return jsonify(response_object),400
+        return jsonify(response_object),500
     return jsonify(response_object),400
 
 # 刪除文字方塊
@@ -968,6 +987,7 @@ def delete_tag():
 def delete_texBox():
     response_object = {'status': 'success'}
     post_data = request.get_json()
+    user = auth.current_user()
 
     textbox_id=post_data.get("textBox_id")
     textbox_exists = session.query(exists().where(TextBox.id == textbox_id)).scalar()
@@ -977,6 +997,15 @@ def delete_texBox():
         return jsonify(response_object), 400
     
     try:
+        user_owns_textBox = (
+            session.query(exists().where(TextBox.id == textbox_id, Record.user_id == user.id))
+            .join(Record, TextBox.record_id == Record.id)
+            .scalar()
+        )
+        if not user_owns_textBox:
+            response_object['message'] = 'user不擁有此文字方框，無法刪除'
+            return jsonify(response_object), 403
+        
         tag_textboxs= session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
         if not tag_textboxs:
             response_object["message"] = "此文字方塊無標籤"
@@ -1264,11 +1293,20 @@ def edit_textBox():
         response_object['message'] = '文字方框不存在'
         return jsonify(response_object), 400
     
-    try:        
-        session.query(TextBox).filter(TextBox.id == post_data.get("textBox_id")).update({
-            "textBox_content": post_data.get("textBox_content")
-        })
-        session.commit()
+    try:
+        user_owns_textBox = (
+            session.query(exists().where(TextBox.id == textbox_id, Record.user_id == user.id))
+            .join(Record, TextBox.record_id == Record.id)
+            .scalar()
+        )
+        if not user_owns_textBox:
+            response_object['message'] = 'user不擁有此文字方框，無法編輯'
+            return jsonify(response_object), 403
+        else:
+            session.query(TextBox).filter(TextBox.id == textbox_id).update({
+                "textBox_content": post_data.get("textBox_content")
+            })
+            session.commit()
     except Exception as e:
         print(str(e))
         response_object["status"] = "failed"
