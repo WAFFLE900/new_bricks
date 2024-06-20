@@ -51,6 +51,16 @@ def create_app(test_mode=False):
     def bricks():
         return ("Bricks專案管理實用工具讚讚!")
 
+    @app.route('/rollback', methods=['POST'])
+    def rollback():
+        try:
+            response_object = {"status": "success"}
+            GlobalObjects.db_session.rollback()
+        except Exception as e:
+            response_object["status"] = "failed"
+            response_object["message"] = str(e)
+        return jsonify(response_object)
+
     return app
 
 
