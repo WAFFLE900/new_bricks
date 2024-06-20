@@ -34,6 +34,7 @@ def bricks_register():
     except:
         response_object['status'] = "failure"
         response_object['message'] = "資料庫錯誤"
+        GlobalObjects.db_session.rollback()
         return jsonify(response_object)
 
     # The registration succeeds
@@ -45,20 +46,20 @@ def bricks_register():
 
 #加入使用者資訊 #取出資訊如果為list 要轉字串
 @bp.route('/register/survey', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
 def register_survey():
     response_object = {'status': 'success'}
     response_object['message'] = "使用者調查註冊成功"
-
-    # try:
-    #     conn = engine.connect()
-    # except:
-    #     response_object['status'] = "failure"
-    #     response_object['message'] = "資料庫連線失敗"
-    #     return jsonify(response_object)
-    
+    try:
+        conn = GlobalObjects.db_engine.connect()
+    except:
+        response_object['status'] = "failure"
+        response_object['message'] = "資料庫連線失敗"
+        return jsonify(response_object)
     post_data = request.get_json()
     try:
-        user=GlobalObjects.db_session.query(User).filter(User.id==post_data.get('user_id')).first()
+        # user=GlobalObjects.db_session.query(User).filter(User.id==post_data.get('user_id')).first()
+        user = GlobalObjects.flask_auth.current_user()
         if user is None:
             response_object['status']="failure"
             response_object['message']="找不到帳號"
@@ -73,7 +74,9 @@ def register_survey():
     except Exception as e:
         response_object['status'] = "failure"
         response_object['message'] = "INSERT userInfo 失敗"
+        GlobalObjects.db_session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
+        GlobalObjects.db_session.rollback()
 
-    # conn.close()
+    conn.close()
     return jsonify(response_object)
