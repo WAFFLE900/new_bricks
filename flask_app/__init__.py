@@ -13,7 +13,7 @@ class BricksGlobalObjects():
     def init_global_objects(self, app: Flask):
         ''' Call this method in Flask application factory create_app 
             to initialize the global objects of 3rd party extensions. '''
-        self.db_engine = create_engine(app.config['DB_URL'], echo=False)
+        self.db_engine = create_engine(app.config['DB_URL'], echo=app.config['SQLALCHEMY_ECHO'])
         self.db_session = scoped_session(sessionmaker(bind=self.db_engine))
 
         self.oauth = OAuth(app)
