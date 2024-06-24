@@ -345,9 +345,11 @@ def row2dict(SQL_data):
     return data
 
 @app.route('/project_index', methods=['POST'])
+@auth.login_required()
 def get_project():
     response_object = {"status": "success"}
     post_data = request.get_json()
+    user = auth.current_user()
     # def get_data(sql):
     #     data = {}
     #     for project, project_sort in sql:
@@ -365,7 +367,7 @@ def get_project():
             SQL_q_item = session.query(
                 Project
             ).filter(
-                Project.user_id==post_data.get("user_id"),
+                Project.user_id==user.id,
                 Project.project_trashcan==0,
                 Project.project_ended==0
             ).order_by(
@@ -375,7 +377,7 @@ def get_project():
             SQL_q_user = session.query(
                 User
             ).filter(
-                User.id==post_data.get("user_id"),
+                User.id==user.id,
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
@@ -408,7 +410,7 @@ def get_project():
             SQL_q_item = session.query(
                 Project
             ).filter(
-                Project.user_id==post_data.get("user_id"),
+                Project.user_id==user.id,
                 Project.project_trashcan==0,
                 Project.project_ended==1
             ).order_by(
@@ -418,7 +420,7 @@ def get_project():
             SQL_q_user = session.query(
                 User
             ).filter(
-                User.id==post_data.get("user_id"),
+                User.id==user.id,
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
@@ -452,7 +454,7 @@ def get_project():
             in_month_SQL_data = session.query(
                 Project
             ).filter(
-                Project.user_id == post_data.get("user_id"),
+                Project.user_id == user.id,
                 Project.project_trashcan == 1,
                 Project.project_edit_date>=time_delta
             ).order_by(
@@ -462,7 +464,7 @@ def get_project():
             not_in_month_SQL_data = session.query(
                 Project
             ).filter(
-                Project.user_id == post_data.get("user_id"),
+                Project.user_id == user.id,
                 Project.project_trashcan == 1,
                 Project.project_edit_date<time_delta
             ).order_by(
@@ -472,7 +474,7 @@ def get_project():
             SQL_q_user = session.query(
                 User
             ).filter(
-                User.id==post_data.get("user_id"),
+                User.id==user.id,
             ).all()
 
         except Exception as e:
@@ -520,10 +522,12 @@ def get_project():
 
 
 @app.route("/set_project_end", methods=["POST"])
+@auth.login_required()
 def set_end():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
+        user = auth.current_user()
         if(post_data.get("state") == "end"):
             state = True
         elif(post_data.get("state") == "open"):
@@ -540,16 +544,18 @@ def set_end():
     return jsonify(response_object)
 
 @app.route('/add_project', methods=['POST'])
+@auth.login_required()
 def add_project():
     response_object = {"status": "success"}
     post_data = request.get_json()
+    user = auth.current_user()
     try:
         print(session.query(User).all())
         new_project = Project(project_type=post_data.get("project_type"), project_image=post_data.get("project_image"),
                             project_name=post_data.get("project_name"), project_trashcan=post_data.get("project_trashcan"),
                             project_ended=post_data.get("project_ended"), project_edit=post_data.get("project_isEdit"),
                             project_visible=post_data.get("project_isVisible"), project_comment=post_data.get("project_isComment"),
-                            user_id=post_data.get("user_id"))
+                            user_id=user.id)
         session.add(new_project)
         session.flush()
         session.commit()
@@ -568,10 +574,12 @@ def add_project():
 
 
 @app.route("/add_type", methods=["POST"])
+@auth.login_required()
 def add_type():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
+        user = auth.current_user()
         session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_type":post_data.get("project_type")})
         session.commit()
 
@@ -587,10 +595,12 @@ def add_type():
     return jsonify(response_object)
 
 @app.route("/edit_type", methods=["POST"])
+@auth.login_required()
 def set_type():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
+        user = auth.current_user()
         project_count = session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).count()
         if project_count == 0:
             response_object["status"] = "failed"
@@ -612,10 +622,12 @@ def set_type():
     return jsonify(response_object)
 
 @app.route("/to_trashcan", methods=["POST"])
+@auth.login_required()
 def trashcan():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
+        user = auth.current_user()
         project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
         if project is None:
             response_object["status"]="failed"
@@ -633,10 +645,12 @@ def trashcan():
     return jsonify(response_object)
 
 @app.route("/trashcan_recover", methods=["POST"])
+@auth.login_required()
 def recover():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
+        user = auth.current_user()
         project=session.query(Project).filter(Project.id==post_data.get("project_id")).first()
         if project is None:
             response_object["status"]="failed"
@@ -654,10 +668,12 @@ def recover():
     return jsonify(response_object)
 
 @app.route("/permanent_delete", methods=["POST"])
+@auth.login_required()
 def permanent_delete():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
+        user = auth.current_user()
         session.query(Project).filter(Project.id==post_data.get("project_id")).delete()
         session.flush()
         session.commit()
@@ -671,21 +687,23 @@ def permanent_delete():
     return jsonify(response_object)
 
 @app.route('/search', methods=['POST'])
+@auth.login_required()
 def search():
     response_object = {'status': 'success'}
     post_data = request.get_json()
+    user = auth.current_user()
 
     try:
         rank_score = []
         status = post_data.get("search_status")
         if status == "normal":
-            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_ended == False, Project.project_trashcan == False).all()
+            project_list = session.query(Project).filter(Project.user_id == user.id, Project.project_ended == False, Project.project_trashcan == False).all()
         elif status == "ended":
-            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_ended == True, Project.project_trashcan == False).all()
+            project_list = session.query(Project).filter(Project.user_id == user.id, Project.project_ended == True, Project.project_trashcan == False).all()
         elif status == "trashcan":
-            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id"), Project.project_trashcan == True).all()
+            project_list = session.query(Project).filter(Project.user_id == user.id, Project.project_trashcan == True).all()
         elif status == "":
-            project_list = session.query(Project).filter(Project.user_id == post_data.get("user_id")).all()
+            project_list = session.query(Project).filter(Project.user_id == user.id).all()
 
         for project in project_list:
             d = {}
