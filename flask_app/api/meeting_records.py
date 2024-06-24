@@ -51,7 +51,7 @@ def tag_index():
 
 # 標籤搜尋
 @bp.route('/tag_search', methods=['POST'])
-@GlobalObjects.flash_auth.login_required()
+@GlobalObjects.flask_auth.login_required()
 def tag_search():
     response_object = {'status': 'success'}
     try:
