@@ -67,7 +67,7 @@ def google_login():
         print(e)
         response_object = {
             'status':'failure',
-            'message':"資料庫錯誤"
+            'message':str(e)
         }
         return jsonify(response_object)
 
@@ -108,7 +108,7 @@ def bricks_login():
         print(e)
         response_object = {
             'status':'failure',
-            'message':"資料庫錯誤"
+            'message':str(e)
         }
         return jsonify(response_object)
 

@@ -33,7 +33,7 @@ def bricks_register():
         GlobalObjects.db_session.commit()
     except:
         response_object['status'] = "failure"
-        response_object['message'] = "資料庫錯誤"
+        response_object['message'] = str(e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object)
 
@@ -73,7 +73,7 @@ def register_survey():
 
     except Exception as e:
         response_object['status'] = "failure"
-        response_object['message'] = "INSERT userInfo 失敗"
+        response_object['message'] = str(e)
         GlobalObjects.db_session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
