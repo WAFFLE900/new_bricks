@@ -288,6 +288,9 @@ def set_type():
         print(e)
         GlobalObjects.db_session.rollback()
 
+    response_object["message"] = "修改{}類別成{}類別成功".format(post_data.get("old_project_type"), post_data.get("project_type"))
+    return jsonify(response_object)
+
 
 @bp.route("/to_trashcan", methods=["POST"])
 @GlobalObjects.flask_auth.login_required()
