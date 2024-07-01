@@ -291,14 +291,27 @@ def delete_texBox():
         return jsonify(response_object), 400
     
     try:
+        # user_owns_textBox = (
+        #     GlobalObjects.db_session.query(exists().where(TextBox.id == textbox_id))
+        #     .select_from(TextBox)
+        #     .join(Record, TextBox.record_id == Record.id)
+        #     .join(Project, Record.project_id == Project.id)
+        #     .filter(Project.user_id == user.id)
+        #     .scalar()
+        # )
+
         user_owns_textBox = (
-            GlobalObjects.db_session.query(exists().where(TextBox.id == textbox_id))
-            .select_from(TextBox)
-            .join(Record, TextBox.record_id == Record.id)
-            .join(Project, Record.project_id == Project.id)
-            .filter(Project.user_id == user.id)
+            GlobalObjects.db_session.query(
+                GlobalObjects.db_session.query(TextBox.id)
+                .join(Record, TextBox.record_id == Record.id)
+                .join(Project, Record.project_id == Project.id)
+                .filter(TextBox.id == textbox_id, Project.user_id == user.id)
+                # .filter(TextBox.id == textbox_id, Project.user_id == 34)
+                .exists()
+            )
             .scalar()
         )
+
         if not user_owns_textBox:
             response_object['message'] = 'user不擁有此文字方框，無法刪除'
             return jsonify(response_object), 403
@@ -306,6 +319,7 @@ def delete_texBox():
         tag_textboxs= GlobalObjects.db_session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
         if not tag_textboxs:
             response_object["message"] = "此文字方塊無標籤"
+            print("此文字方塊無標籤")
         else:
             tag_ids = [record.tag_id for record in tag_textboxs]
             # 提取 Tag 物件的 id 值
@@ -336,7 +350,7 @@ def delete_texBox():
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 # 顯示垃圾桶中會議記錄
 @bp.route('/trashcan_record', methods=['POST'])
@@ -404,7 +418,7 @@ def add_record():
         return jsonify(response_object), 404
     response_object["message"] = "新增成功"
     response_object["record_id"] = new_record.id
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 @bp.route('/get_record_index', methods=['POST'])
 @GlobalObjects.flask_auth.login_required(optional=True)
@@ -447,7 +461,7 @@ def get_record_index():
         GlobalObjects.db_session.rollback()
         return jsonify(response_object)
 
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 @bp.route('/edit_record', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -479,7 +493,7 @@ def edit_record():
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
 
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 @bp.route('/delete_record', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -494,7 +508,7 @@ def delete_record():
         if record_count == 0:
             response_object["status"] = "failed"
             response_object["message"] = "查無紀錄"
-            return jsonify(response_object)
+            return jsonify(response_object),400
         GlobalObjects.db_session.query(Record).filter(Record.id == post_data.get("record_id")).update({"record_trashcan": 1})
         GlobalObjects.db_session.commit()
         response_object["message"] = "刪除成功"
@@ -505,7 +519,7 @@ def delete_record():
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
 
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 @bp.route('/get_record', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -553,7 +567,7 @@ def add_textBox():
     user = GlobalObjects.flask_auth.current_user()
 
     record_id=post_data.get("record_id")
-    record_exists = GlobalObjects.db_session.query(exists().where(Record.id == record_id),Record.user_id==user.id).scalar()
+    record_exists = GlobalObjects.db_session.query(exists().where(Record.id == record_id,Record.user_id==user.id)).scalar()
     if not record_exists:
         response_object['status'] = 'failed'
         response_object['message'] = '會議記錄不存在'
@@ -569,9 +583,9 @@ def add_textBox():
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         GlobalObjects.db_session.rollback()
-        return jsonify(response_object)
+        return jsonify(response_object), 400
     response_object["message"] = f"新增[{post_data.get('textBox_content')}] 進 record[{post_data.get('record_id')}]成功"
-    return jsonify(response_object) ,400
+    return jsonify(response_object) ,200
 
 @bp.route('/edit_textBox', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -588,12 +602,23 @@ def edit_textBox():
         return jsonify(response_object), 400
     
     try:
+        # user_owns_textBox = (
+        #     GlobalObjects.db_session.query(exists().where(TextBox.id == textbox_id))
+        #     .select_from(TextBox)
+        #     .join(Record, TextBox.record_id == Record.id)
+        #     .join(Project, Record.project_id == Project.id)
+        #     .filter(Project.user_id == user.id)
+        #     .scalar()
+        # )
+
         user_owns_textBox = (
-            GlobalObjects.db_session.query(exists().where(TextBox.id == textbox_id))
-            .select_from(TextBox)
-            .join(Record, TextBox.record_id == Record.id)
-            .join(Project, Record.project_id == Project.id)
-            .filter(Project.user_id == user.id)
+            GlobalObjects.db_session.query(
+                GlobalObjects.db_session.query(TextBox.id)
+                .join(Record, TextBox.record_id == Record.id)
+                .join(Project, Record.project_id == Project.id)
+                .filter(TextBox.id == textbox_id, Project.user_id == user.id)
+                .exists()
+            )
             .scalar()
         )
         if not user_owns_textBox:
@@ -611,7 +636,7 @@ def edit_textBox():
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
     response_object["message"] = f"修改 textBox[{post_data.get('textBox_id')}] 的內容成[{post_data.get('textBox_content')}]成功"
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 @bp.route('/recover_record', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -625,8 +650,8 @@ def recover_record():
         if record_count == 0:
             response_object["status"] = "failed"
             response_object["message"] = "查無紀錄"
-            return jsonify(response_object)
-        GlobalObjects.db_session.query(Record).filter(Record.id == post_data.get("record_id"),Record.user_id==post_data.get("user_id")).update({"record_trashcan":0})
+            return jsonify(response_object),400
+        GlobalObjects.db_session.query(Record).filter(Record.id == post_data.get("record_id"),Record.user_id==user.id).update({"record_trashcan":0})
         GlobalObjects.db_session.commit()
         response_object["message"] = "復原成功"
 
@@ -635,7 +660,7 @@ def recover_record():
         response_object["message"] = str(e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 @bp.route('/delete_record_permanent', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -659,5 +684,5 @@ def delete_record_permanent():
         response_object["message"] = str(e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
