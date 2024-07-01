@@ -15,6 +15,7 @@ def get_project():
     response_object = {"status": "success"}
     post_data = request.get_json()
     user = GlobalObjects.flask_auth.current_user()
+    print(user)
     # def get_data(sql):
     #     data = {}
     #     for project, project_sort in sql:
@@ -46,8 +47,8 @@ def get_project():
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
-            response_object["message"] = "SQL 搜尋失敗"
-            print(str(e))
+            response_object["message"] = str(e)
+            print(e)
             GlobalObjects.db_session.rollback()
             return jsonify(response_object), 404
         data = row2dict(SQL_q_item)
@@ -89,7 +90,7 @@ def get_project():
             ).all()
         except Exception as e:
             response_object["status"] = "failed"
-            response_object["message"] = "SQL 搜尋失敗"
+            response_object["message"] = str(e)
             print(str(e))
             GlobalObjects.db_session.rollback()
             return jsonify(response_object), 404
@@ -144,7 +145,7 @@ def get_project():
 
         except Exception as e:
             response_object["status"] = "failed"
-            response_object["message"] = "SQL 搜尋失敗"
+            response_object["message"] = str(e)
             print(str(e))
             GlobalObjects.db_session.rollback()
             return jsonify(response_object), 404
@@ -201,7 +202,7 @@ def set_end():
         GlobalObjects.db_session.commit()
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = "SQL 搜尋失敗，找不到專案"
+        response_object["message"] = str(e)
         print(str(e))
         GlobalObjects.db_session.rollback()
         return jsonify(response_object), 404
@@ -229,7 +230,7 @@ def add_project():
 
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = "新增失敗"
+        response_object["message"] = str(e)
         print(str(e))
         GlobalObjects.db_session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
@@ -252,7 +253,7 @@ def add_type():
 
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = "新增失敗"
+        response_object["message"] = str(e)
         print(str(e))
         GlobalObjects.db_session.rollback()
         logging.exception('Error at %s', 'division', exc_info=e)
