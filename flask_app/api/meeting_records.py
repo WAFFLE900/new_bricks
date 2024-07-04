@@ -188,32 +188,77 @@ def add_tag():
             .filter(User.id == user.id)
             .scalar()
         )
+        print(project_id)
+
         # 在porject_id已經篩過user_id了
-        tag = (
-            GlobalObjects.db_session.query(Tag)
+        # tag = (
+        #     GlobalObjects.db_session.query(Tag)
+        #     .select_from(Project)
+        #     .join(Record, Project.id == Record.project_id)
+        #     .join(TextBox, Record.id == TextBox.record_id)
+        #     .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+        #     .join(Tag, TagTextBox.tag_id == Tag.id)
+        #     .filter(Project.id == project_id)
+        #     .filter(Tag.tag_name == post_data.get("tag_name"))
+        #     .first()
+        # )
+
+        # 原本的做法是搜尋"在這個project中，有沒有相同名稱的tag存在"。如果有就新增標籤。
+        # 但我認為，這會少考慮到一個情況："將既存的標籤連結到新的textbox上"
+
+        # 因此將程式邏輯改成：
+        # if not "在這個project中存在這組tag-textBox relationship"
+        #   if not "這個project中存在tag_name這個名字的標籤"
+        #       新增一個tag到DB
+        #   搜尋project中，相同tag_name的tag
+        #   新增tag-textBox relationship到BD
+        # else
+        #   標籤已存在
+
+        tag_textbox = (
+            GlobalObjects.db_session.query(TagTextBox)
             .select_from(Project)
             .join(Record, Project.id == Record.project_id)
             .join(TextBox, Record.id == TextBox.record_id)
             .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
             .join(Tag, TagTextBox.tag_id == Tag.id)
             .filter(Project.id == project_id)
+            .filter(TextBox.id == post_data.get("textBox_id"))
             .filter(Tag.tag_name == post_data.get("tag_name"))
-            .first()
+            .scalar()
         )
-        if tag is None:
-            print("tag is none")
-            new_tag=Tag(tag_name=post_data.get("tag_name"), tag_class=post_data.get("tag_class"))
-            GlobalObjects.db_session.add(new_tag)
-            GlobalObjects.db_session.flush()
-            GlobalObjects.db_session.commit()
-            print("tag_name: ", post_data.get("tag_name"))
-            new_tagId = (
-                GlobalObjects.db_session.query(Tag.id)
+        if tag_textbox is None:
+            print("tag textbox relationship is none")
+            tag = (
+                GlobalObjects.db_session.query(Tag)
+                .select_from(Project)
+                .join(Record, Project.id == Record.project_id)
+                .join(TextBox, Record.id == TextBox.record_id)
+                .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+                .join(Tag, TagTextBox.tag_id == Tag.id)
+                .filter(Project.id == project_id)
                 .filter(Tag.tag_name == post_data.get("tag_name"))
                 .first()
             )
-            print("new_tagId: ", new_tagId[0])
-            new_tagTextBox=TagTextBox(tag_id=new_tagId[0], textBox_id=post_data.get("textBox_id"))
+            if tag is None:
+                print("The tag with tag_name is none")
+                new_tag=Tag(tag_name=post_data.get("tag_name"), tag_class=post_data.get("tag_class"))
+                GlobalObjects.db_session.add(new_tag)
+                GlobalObjects.db_session.flush()
+                GlobalObjects.db_session.commit()
+                print("tag_name: ", post_data.get("tag_name"))
+                # new_tagId = (
+                #     GlobalObjects.db_session.query(Tag.id)
+                #     .filter(Tag.tag_name == post_data.get("tag_name"))
+                #     .first()
+                # )
+
+                # 這裡可能沒有考慮到"tag必須是這個project的tag"(因為不能改到其他project的tag，即使他們同名)
+                # 所以直接拿剛創建的tag來用
+                tag = new_tag
+
+            print("Tag ID: ", tag.id)
+            new_tagTextBox=TagTextBox(tag_id=tag.id, textBox_id=post_data.get("textBox_id"))
             GlobalObjects.db_session.add(new_tagTextBox)
             GlobalObjects.db_session.flush()
             GlobalObjects.db_session.commit()
@@ -226,7 +271,7 @@ def add_tag():
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
-        return jsonify(response_object)
+        return jsonify(response_object), 500
     return jsonify(response_object)
 
 # 刪除標籤
@@ -246,14 +291,16 @@ def delete_tag():
             # 把所有table連起來判斷user_id
             project_id = (
                 GlobalObjects.db_session.query(Project.id)
-                .select_from(User)
-                .join(Project, User.id == Project.user_id)
+                # .select_from(User)
+                # .join(Project, User.id == Project.user_id)
+                .select_from(Project)
                 .join(Record, Project.id == Record.project_id)
                 .join(TextBox, Record.id == TextBox.record_id)
                 .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
                 .join(Tag, TagTextBox.tag_id == Tag.id)
                 .filter(Tag.id == tag_id)
                 .filter(User.id == user.id)
+                .distinct()
                 .scalar()
             )
             if project_id is None:
