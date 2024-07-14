@@ -4,6 +4,7 @@ from flask_app.models import *
 from sqlalchemy import exists, func, desc, and_
 import logging
 import json
+import re
 
 bp = Blueprint('meeting_records', __name__)
 
@@ -428,26 +429,41 @@ def add_record():
     post_data = request.get_json()
     user = GlobalObjects.flask_auth.current_user()
     project_id = post_data.get("project_id")
-    record_name=post_data.get("record_name")
+    # record_name=post_data.get("record_name")
 
-    project_exists = GlobalObjects.db_session.query(exists().where(Project.id == project_id)).scalar()
+    project_exists = GlobalObjects.db_session.query(exists().where(Project.id == project_id, Project.user_id == user.id)).scalar()
     if not project_exists:
         response_object['status'] = 'failed'
         response_object['message'] = '專案不存在'
         return jsonify(response_object), 400
-    record_exists = GlobalObjects.db_session.query(exists().where(Record.record_name == record_name)).scalar()
-    if record_exists:
-        response_object['status'] = 'failed'
-        response_object['message'] = '會議記錄已存在'
-        return jsonify(response_object), 400
+    # record_exists = GlobalObjects.db_session.query(exists().where(Record.record_name == record_name)).scalar()
+    # if record_exists:
+    #     response_object['status'] = 'failed'
+    #     response_object['message'] = '會議記錄已存在'
+    #     return jsonify(response_object), 400
+
+    unamed_records = (GlobalObjects.db_session.query(Record.record_name)
+                      .join(Project, Record.project_id == Project.id)
+                      .filter(Project.user_id == user.id)
+                      .filter(Record.project_id == project_id)
+                      .filter(Record.record_name.like('未命名會議紀錄%'))
+                      .all()
+                    )
+    print(unamed_records)
+    pattern = re.compile(r'^未命名會議紀錄(\d+)$')
+    max_unamed_record_index = max(
+            [int(pattern.match(record_name[0]).group(1)) for record_name in unamed_records if pattern.match(record_name[0])],
+            default=0
+        )
+    # return {'max_idx': max_unamed_record_index}, 400
 
     try:
         print(GlobalObjects.db_session.query(User).all())
-        new_record = Record(record_name=post_data.get("record_name"),
+        new_record = Record(record_name=f'未命名會議紀錄{max_unamed_record_index + 1}',
                             record_date=post_data.get("record_date"),
-                            record_department=post_data.get("record_department"),
+                            # record_department=post_data.get("record_department"),
                             # record_attendances=post_data.get("record_attendances"),
-                            record_place=post_data.get("record_place"),
+                            # record_place=post_data.get("record_place"),
                             # record_host_name=post_data.get("record_host_name"),
                             record_trashcan=False,
                             user_id=user.id,
@@ -465,6 +481,7 @@ def add_record():
         return jsonify(response_object), 404
     response_object["message"] = "新增成功"
     response_object["record_id"] = new_record.id
+    response_object["record_name"] = new_record.record_name
     return jsonify(response_object),200
 
 @bp.route('/get_record_index', methods=['POST'])
@@ -480,24 +497,31 @@ def get_record_index():
             .join(Project, Record.project_id == Project.id)
             .filter(Project.user_id==user.id, Project.id == post_data.get("project_id"))
             .filter(Record.record_trashcan == False)
+            .order_by(Record.record_creation_time)
             .all()
         )
         print("user_id: ", user.id)
         print("record_get: ", record_get)
         for records in record_get:
-            tag_get = GlobalObjects.db_session.query(Tag).join(TagTextBox, Tag.id == TagTextBox.tag_id).join(TextBox, TagTextBox.textBox_id == TextBox.id).join(Record, TextBox.record_id == Record.id).filter(TextBox.record_id == str(getattr(records, "id"))).all()
+            tag_get = (GlobalObjects.db_session.query(Tag)
+                       .join(TagTextBox, Tag.id == TagTextBox.tag_id)
+                       .join(TextBox, TagTextBox.textBox_id == TextBox.id)
+                       .join(Record, TextBox.record_id == Record.id)
+                       .filter(TextBox.record_id == str(getattr(records, "id")))
+                       .all()
+                    )
             
             return_tags = []
             for tags in tag_get:
                 return_tags.append(str(getattr(tags, "tag_name")))
 
             response_object["record"].append({'record_name':str(getattr(records, "record_name")),
-                                              'record_date':str(getattr(records, "record_date")),
-                                              'record_department':str(getattr(records, "record_department")),
-                                              #'record_attendances':str(getattr(records, "record_attendances")),
-                                              'record_place':str(getattr(records, "record_place")),
-                                              'record_attendees_name':str(getattr(records,"record_attendees_name")),
-                                              #'record_host_name':str(getattr(records, "record_host_name")),
+                                            #   'record_date':str(getattr(records, "record_date")),
+                                            #   'record_department':str(getattr(records, "record_department")),
+                                            #   'record_attendances':str(getattr(records, "record_attendances")),
+                                            #   'record_place':str(getattr(records, "record_place")),
+                                            #   'record_attendees_name':str(getattr(records,"record_attendees_name")),
+                                            #   'record_host_name':str(getattr(records, "record_host_name")),
                                               'tags':return_tags
                                               })
 
@@ -574,6 +598,15 @@ def get_record():
     response_object = {'status': 'success'}
     post_data = request.get_json()
     user = GlobalObjects.flask_auth.current_user()
+
+    record_id=post_data.get("record_id")
+    project_id=post_data.get("project_id")
+    record_exists = GlobalObjects.db_session.query(exists().where(Record.id == record_id, Record.project_id==project_id, Record.user_id==user.id)).scalar()
+    if not record_exists:
+        response_object['status'] = 'failed'
+        response_object['message'] = '會議記錄不存在'
+        return jsonify(response_object), 400
+
     try:        
         record_get = (
             GlobalObjects.db_session.query(Record)
@@ -585,18 +618,41 @@ def get_record():
         )
         record_data = row2dict(record_get)
         response_object["record_info"] = record_data
-        textBox_list = []
         textBox_get = (
-            GlobalObjects.db_session.query(TextBox)
-            .join(Record, TextBox.record_id == Record.id)
+            GlobalObjects.db_session.query(
+                TextBox.id, TextBox.record_id, TextBox.textBox_content, TextBox.textBox_update_time,
+                func.concat(
+                    '[',
+                    func.group_concat(
+                        func.concat(
+                            '{"Tag_id": ', Tag.id, ', "Tag_name": "', Tag.tag_name, '", "Tag_class": "', Tag.tag_class, '"}'
+                        )
+                    ),
+                    ']'
+                ).label("Tag")
+            )
+            .select_from(Record)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .join(Tag, TagTextBox.tag_id == Tag.id)
             .filter(Record.id == post_data.get("record_id"))
             .filter(Record.record_trashcan == 0)
+            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content, TextBox.textBox_update_time) # group by all the non-aggregated columes
+            .order_by(Record.id)
             .all()
         )
-        textBox_data = row2dict(textBox_get)
-        print(textBox_data)
-        textBox_list.append(textBox_data)
-        response_object["textBox"] = textBox_list
+        for row in textBox_get:
+            print(row)
+        response_object["textBox"] = [
+            {
+                "TextBox_id": row[0],
+                "record_id": row[1],
+                "textBox_content": row[2],
+                "textBox_update_time": row[3],
+                "Tag": json.loads(f"{row[4]}")
+            }
+            for row in textBox_get
+        ]
     except Exception as e:
         print(str(e))
         response_object["status"] = "failed"
