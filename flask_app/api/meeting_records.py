@@ -5,6 +5,7 @@ from sqlalchemy import exists, func, desc, and_
 import logging
 import json
 import re
+from datetime import datetime, timezone
 
 bp = Blueprint('meeting_records', __name__)
 
@@ -264,6 +265,17 @@ def add_tag():
             GlobalObjects.db_session.flush()
             GlobalObjects.db_session.commit()
             response_object["message"] = "新增{}成功".format(post_data.get("tag_name"))
+
+            record_id = (
+                GlobalObjects.db_session.query(Record.id)
+                .join(TextBox, Record.id == TextBox.record_id)
+                .filter(TextBox.id == textbox_id)
+                .scalar()
+            )
+            GlobalObjects.db_session.query(Record).filter(Record.id == record_id,Record.user_id==user.id).update({
+                'record_update_time': datetime.now(timezone.utc).replace(tzinfo=None)
+            })
+            GlobalObjects.db_session.commit()
         else:
             response_object["message"] = "標籤已存在"
     except Exception as e:
@@ -282,38 +294,46 @@ def delete_tag():
     response_object = {'status': 'success'}
     post_data = request.get_json()
     user = GlobalObjects.flask_auth.current_user()
+    tag_id = post_data.get("tag_id")
+    textBox_id = post_data.get("textBox_id")
     try:
-        tag_id = post_data.get("tag_id")
-        dTag = GlobalObjects.db_session.query(Tag).filter(Tag.id==tag_id).first()
-        print("tag to delete: ", dTag)
-        if dTag is None:
-            response_object["message"] = "標籤不存在"
+        tag_textBox = GlobalObjects.db_session.query(TagTextBox).filter(TagTextBox.tag_id==tag_id, TagTextBox.textBox_id==textBox_id).first()
+        print("tag_textBox relation to delete: ", tag_textBox)
+        if tag_textBox is None:
+            response_object["message"] = "標籤與文字方塊的關係不存在"
         else:
             # 把所有table連起來判斷user_id
-            project_id = (
-                GlobalObjects.db_session.query(Project.id)
-                # .select_from(User)
-                # .join(Project, User.id == Project.user_id)
+            (project_id, record_id) = (
+                GlobalObjects.db_session.query(Project.id, Record.id)
                 .select_from(Project)
                 .join(Record, Project.id == Record.project_id)
                 .join(TextBox, Record.id == TextBox.record_id)
                 .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
                 .join(Tag, TagTextBox.tag_id == Tag.id)
                 .filter(Tag.id == tag_id)
-                .filter(User.id == user.id)
+                .filter(TextBox.id == textBox_id)
+                .filter(Project.user_id == user.id)
                 .distinct()
-                .scalar()
+                .first()
             )
             if project_id is None:
                 response_object['message'] = "user不擁有此標籤，無法刪除"
                 return jsonify(response_object),403
-            
-            GlobalObjects.db_session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id).delete()
+
+            GlobalObjects.db_session.query(TagTextBox).filter(TagTextBox.tag_id == tag_id, TagTextBox.textBox_id==textBox_id).delete()
             GlobalObjects.db_session.flush()
-            GlobalObjects.db_session.query(Tag).filter(Tag.id==tag_id).delete()
-            GlobalObjects.db_session.flush()
+
+            tag_exist_in_tagTextBox = GlobalObjects.db_session.query(exists().where(TagTextBox.tag_id == tag_id)).scalar()
+            if not tag_exist_in_tagTextBox:
+                GlobalObjects.db_session.query(Tag).filter(Tag.id==tag_id).delete()
+                GlobalObjects.db_session.flush()
+                GlobalObjects.db_session.commit()
+            response_object["message"] = "成功刪除標籤{}與文字方塊{}的連結".format(tag_id, textBox_id)
+  
+            GlobalObjects.db_session.query(Record).filter(Record.id == record_id,Record.user_id==user.id).update({
+                'record_update_time': datetime.now(timezone.utc).replace(tzinfo=None)
+            })
             GlobalObjects.db_session.commit()
-            response_object["message"] = "刪除標籤{}成功".format(post_data.get("tag_id"))
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = "標籤尋找失敗"
@@ -364,6 +384,13 @@ def delete_texBox():
             response_object['message'] = 'user不擁有此文字方框，無法刪除'
             return jsonify(response_object), 403
         
+        record_id = (
+            GlobalObjects.db_session.query(Record.id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .filter(TextBox.id == textbox_id)
+            .scalar()
+        )
+
         tag_textboxs= GlobalObjects.db_session.query(TagTextBox).filter_by(textBox_id=post_data.get("textBox_id")).all()
         if not tag_textboxs:
             response_object["message"] = "此文字方塊無標籤"
@@ -391,6 +418,11 @@ def delete_texBox():
         GlobalObjects.db_session.flush()
         GlobalObjects.db_session.commit()
         response_object["message"] = "刪除文字方框{}成功".format(post_data.get("textBox_id"))
+
+        GlobalObjects.db_session.query(Record).filter(Record.id == record_id, Record.user_id==user.id).update({
+            'record_update_time': datetime.now(timezone.utc).replace(tzinfo=None)
+        })
+        GlobalObjects.db_session.commit()
     except Exception as e:
         response_object["status"] = "failed"
         response_object["message"] = "文字方塊刪除失敗"
@@ -633,8 +665,8 @@ def get_record():
             )
             .select_from(Record)
             .join(TextBox, Record.id == TextBox.record_id)
-            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
-            .join(Tag, TagTextBox.tag_id == Tag.id)
+            .outerjoin(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .outerjoin(Tag, TagTextBox.tag_id == Tag.id)
             .filter(Record.id == post_data.get("record_id"))
             .filter(Record.record_trashcan == 0)
             .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content, TextBox.textBox_update_time) # group by all the non-aggregated columes
@@ -649,7 +681,7 @@ def get_record():
                 "record_id": row[1],
                 "textBox_content": row[2],
                 "textBox_update_time": row[3],
-                "Tag": json.loads(f"{row[4]}")
+                "Tag": (lambda x:json.loads(f"{x}") if x is not None else None)(row[4])
             }
             for row in textBox_get
         ]
@@ -680,6 +712,10 @@ def add_textBox():
         textBox = TextBox(textBox_content = post_data.get("textBox_content"),
                     record_id = post_data.get("record_id"))
         GlobalObjects.db_session.add(textBox)
+        GlobalObjects.db_session.commit()
+        GlobalObjects.db_session.query(Record).filter(Record.id == record_id,Record.user_id==user.id).update({
+            'record_update_time': textBox.textBox_update_time
+        })
         GlobalObjects.db_session.commit()
     except Exception as e:
         print(str(e))
@@ -730,6 +766,11 @@ def edit_textBox():
         else:
             GlobalObjects.db_session.query(TextBox).filter(TextBox.id == textbox_id).update({
                 "textBox_content": post_data.get("textBox_content")
+            })
+            GlobalObjects.db_session.commit()
+            textBox = GlobalObjects.db_session.query(TextBox).filter(TextBox.id == textbox_id).first()
+            GlobalObjects.db_session.query(Record).filter(Record.id == textBox.record_id, Record.user_id==user.id).update({
+                'record_update_time': textBox.textBox_update_time
             })
             GlobalObjects.db_session.commit()
     except Exception as e:
