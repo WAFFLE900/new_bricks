@@ -69,6 +69,7 @@ def google_login():
             'status':'failure',
             'message':str(e)
         }
+        GlobalObjects.db_session.rollback()
         return jsonify(response_object)
 
     # email and password are verified
@@ -110,6 +111,7 @@ def bricks_login():
             'status':'failure',
             'message':str(e)
         }
+        GlobalObjects.db_session.rollback()
         return jsonify(response_object)
 
     # email and password are verified
