@@ -558,7 +558,7 @@ def get_record_index():
                                               })
 
     except Exception as e:
-        print(str(e))
+        print(e)
         response_object["status"] = "failed"
         response_object["message"] = str(e)
         GlobalObjects.db_session.rollback()
@@ -583,8 +583,11 @@ def edit_record():
     try:
         GlobalObjects.db_session.query(Record).filter(Record.id == post_data.get("record_id")).update({
             "record_name": post_data.get("record_name"),
-            "record_department": post_data.get("record_department"),
+            # "record_department": post_data.get("record_department"),
             #"record_attendances": post_data.get("record_attendances"),
+            "record_attendees_name": post_data.get("record_attendees_name"),
+            "record_absentees_name": post_data.get("record_absentees_name"),
+            "record_recorder_name": post_data.get("record_recorder_name"),
             "record_place": post_data.get("record_place")
         })
         GlobalObjects.db_session.commit()
