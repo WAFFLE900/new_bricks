@@ -101,7 +101,7 @@ class ProjectSort(db.Model):
 class Record(db.Model):
     __tablename__ = 'record'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    record_name = db.Column(db.String(100), nullable=False, unique = True)
+    record_name = db.Column(db.String(100), nullable=False)
     record_date = db.Column(db.Date, nullable=True, default = None)
     record_department = db.Column(db.String(50), nullable=True, default = None)
     record_place= db.Column(db.String(50), nullable=True, default = None)
