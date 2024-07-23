@@ -9,8 +9,9 @@ bp = Blueprint('login', __name__)
 @bp.route('/frontend/google_login', methods=['GET'])
 def google_login_entry():
     '''The function simulate the frontend URL which starts the Google OAuth2'''
-    redirect_uri = url_for('login.google_callback', _external=True)
+    # redirect_uri = url_for('login.google_callback', _external=True)
     # redirect_uri = redirect_uri.replace(":5000", ":8080")
+    redirect_uri = "https://bricks.ddns.net/login"
     print(redirect_uri)
     return GlobalObjects.oauth.google.authorize_redirect(redirect_uri)
 
