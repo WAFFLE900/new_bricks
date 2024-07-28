@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from fuzzywuzzy import fuzz
+from datetime import datetime, timedelta
 
 bp = Blueprint('user_homepage', __name__)
 
@@ -402,4 +403,64 @@ def search():
         GlobalObjects.db_session.rollback()
 
     response_object['items'] = sorted_rank
+    return jsonify(response_object)
+
+@bp.route('/show_info', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
+def show_info():
+    response_object = {'status': 'success'}
+    user = GlobalObjects.flask_auth.current_user()
+
+    try:
+        user_info = GlobalObjects.db_session.query(User).filter(User.id==user.id).first()
+        response_object["user_info"] = {
+            'user_name': user_info.user_name,
+            'user_email': user_info.user_email
+        }
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(e)
+        GlobalObjects.db_session.rollback()
+
+    return jsonify(response_object)
+
+@bp.route('/edit_info', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
+def edit_info():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    user = GlobalObjects.flask_auth.current_user()
+
+    try:
+        GlobalObjects.db_session.query(User).filter(User.id==user.id).update({"user_name":post_data.get("user_name"), "user_email":post_data.get("user_email")})
+        GlobalObjects.db_session.commit()
+
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(e)
+        GlobalObjects.db_session.rollback()
+
+    return jsonify(response_object)
+
+@bp.route('/bricks_logout', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
+def bricks_logout():
+    response_object = {'status': 'success'}
+    try:
+        token = request.headers['Authorization']
+        expires_at = datetime.utcnow() + timedelta(days=30)  # 30 天過期
+        blacklisted_token = Blacklist(token=token, expires_at=expires_at)
+        GlobalObjects.db_session.add(blacklisted_token)
+        GlobalObjects.db_session.commit()
+        response_object['message'] = 'logout success'
+    
+    except Exception as e:
+        response_object['status'] = "failure"
+        response_object['message'] = str(e)
+        print(e)
+        GlobalObjects.db_session.rollback()
+    
     return jsonify(response_object)

@@ -6,7 +6,7 @@ from time import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker, Session
 
-from flask_app.models import User
+from flask_app.models import User, Blacklist
 
 
 class BricksGlobalObjects():
@@ -40,6 +40,13 @@ class BricksGlobalObjects():
             user = GlobalObjects.db_session.query(User).filter(User.user_email==data['user_email']).first()
             if user is None:
                 return False
+            
+            blacklisted_token = GlobalObjects.db_session.query(Blacklist).filter(Blacklist.token==f"Bearer {token}").first()
+
+            if blacklisted_token:
+                return False
+                # return jsonify({'message': 'Token has been revoked!'})
+            
             return user
 
         @self.flask_auth.error_handler

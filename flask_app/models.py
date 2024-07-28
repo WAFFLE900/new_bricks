@@ -177,3 +177,12 @@ class User(db.Model):
 
     def __repr__(self):
         return f'<User id={self.id} user_email={self.user_email} user_name={self.user_name}>'
+    
+class Blacklist(db.Model):
+    __tablename__ = 'blacklist'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    token = db.Column(db.String(500), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    def __repr__(self):
+        return f'<token={self.token} expires_at={self.expires_at}>'
