@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 bp = Blueprint('user_homepage', __name__)
 
 @bp.route('/project_index', methods=['POST'])
-@GlobalObjects.flask_auth.login_required(optional=True)
+@GlobalObjects.flask_auth.login_required()
 def get_project():
     response_object = {"status": "success"}
     post_data = request.get_json()
@@ -199,7 +199,17 @@ def set_end():
             state = True
         elif(post_data.get("state") == "open"):
             state = False
-        GlobalObjects.db_session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_ended":state})
+        else:
+            response_object["status"] = "failed"
+            response_object["message"] = "設定的狀態名稱錯誤"
+            return jsonify(response_object)
+
+        project=GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).first()
+        if project is None:
+            response_object["status"]="failed"
+            response_object["message"]="找不到專案"
+            return jsonify(response_object)
+        GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id,Project.id==post_data.get("project_id")).update({"project_ended":state})
         GlobalObjects.db_session.commit()
     except Exception as e:
         response_object["status"] = "failed"
@@ -249,7 +259,7 @@ def add_type():
     try:
         post_data = request.get_json()
         user = GlobalObjects.flask_auth.current_user()
-        GlobalObjects.db_session.query(Project).filter(Project.id==post_data.get("project_id")).update({"project_type":post_data.get("project_type")})
+        GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).update({"project_type":post_data.get("project_type")})
         GlobalObjects.db_session.commit()
 
     except Exception as e:
@@ -271,7 +281,7 @@ def set_type():
     try:
         post_data = request.get_json()
         user = GlobalObjects.flask_auth.current_user()
-        project_count = GlobalObjects.db_session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).count()
+        project_count = GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.project_type == post_data.get("old_project_type")).count()
         if project_count == 0:
             response_object["status"] = "failed"
             response_object["message"] = "輸入類別名稱錯誤"
@@ -279,7 +289,7 @@ def set_type():
         if post_data.get("project_type") == None:
             response_object["message"] = "類別名稱未修改"
             return jsonify(response_object)
-        GlobalObjects.db_session.query(Project).filter(Project.project_type == post_data.get("old_project_type")).update({"project_type": post_data.get("project_type")})
+        GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.project_type == post_data.get("old_project_type")).update({"project_type": post_data.get("project_type")})
         GlobalObjects.db_session.commit()
         response_object["message"] = f"{post_data.get('old_project_type')}成功修改成{post_data.get('project_type')}"
 
@@ -299,8 +309,8 @@ def trashcan():
     response_object = {"status": "success"}
     try:
         post_data = request.get_json()
-        user = GlobalObjects.flask_auth.current_user().id
-        project=GlobalObjects.db_session.query(Project).filter(Project.id==post_data.get("project_id")).first()
+        user = GlobalObjects.flask_auth.current_user()
+        project=GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).first()
         if project is None:
             response_object["status"]="failed"
             response_object["message"]="找不到專案"
@@ -324,7 +334,7 @@ def recover():
     try:
         post_data = request.get_json()
         user = GlobalObjects.flask_auth.current_user()
-        project=GlobalObjects.db_session.query(Project).filter(Project.id==post_data.get("project_id")).first()
+        project=GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).first()
         if project is None:
             response_object["status"]="failed"
             response_object["message"]="找不到專案"
@@ -348,7 +358,12 @@ def permanent_delete():
     try:
         post_data = request.get_json()
         user = GlobalObjects.flask_auth.current_user()
-        GlobalObjects.db_session.query(Project).filter(Project.id==post_data.get("project_id")).delete()
+        project=GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).first()
+        if project is None:
+            response_object["status"]="failed"
+            response_object["message"]="找不到專案"
+            return jsonify(response_object)
+        GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).delete()
         GlobalObjects.db_session.flush()
         GlobalObjects.db_session.commit()
         response_object["message"] = "永久刪除成功"
