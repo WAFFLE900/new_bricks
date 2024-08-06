@@ -5,7 +5,7 @@ from sqlalchemy import exists, func, desc, and_
 import logging
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 bp = Blueprint('meeting_records', __name__)
 
@@ -23,7 +23,7 @@ def get_record_index():
             .join(Project, Record.project_id == Project.id)
             .filter(Project.user_id==user.id, Project.id == post_data.get("project_id"))
             .filter(Record.record_trashcan == False)
-            .order_by(Record.record_creation_time)
+            .order_by(desc(Record.record_creation_time))
             .all()
         )
         print("user_id: ", user.id)
@@ -41,14 +41,15 @@ def get_record_index():
             for tags in tag_get:
                 return_tags.append(str(getattr(tags, "tag_name")))
 
-            response_object["record"].append({'record_name':str(getattr(records, "record_name")),
+            response_object["record"].append({  'record_id':str(getattr(records, "id")),
+                                                'record_name':str(getattr(records, "record_name")),
                                             #   'record_date':str(getattr(records, "record_date")),
                                             #   'record_department':str(getattr(records, "record_department")),
                                             #   'record_attendances':str(getattr(records, "record_attendances")),
                                             #   'record_place':str(getattr(records, "record_place")),
                                             #   'record_attendees_name':str(getattr(records,"record_attendees_name")),
                                             #   'record_host_name':str(getattr(records, "record_host_name")),
-                                              'tags':return_tags
+                                                'tags':return_tags
                                               })
 
     except Exception as e:
@@ -494,10 +495,46 @@ def trashcan_record():
     try:
         post_data = request.get_json()
         user = GlobalObjects.flask_auth.current_user()
-        data = (
-            GlobalObjects.db_session.query(Record).filter(Record.project_id == post_data.get("project_id"), Record.record_trashcan==1, Record.user_id == user.id).all()
+
+        response_object["item"] = []
+        record_get = (
+            GlobalObjects.db_session.query(Record)
+            .join(Project, Record.project_id == Project.id)
+            .filter(Project.user_id==user.id, Project.id == post_data.get("project_id"))
+            .filter(Record.record_trashcan == True)
+            .order_by(desc(Record.record_creation_time))
+            .all()
         )
-        response_object["item"] = [{"Record.id": row.id, "Record.project_id": row.project_id} for row in data]
+        print("user_id: ", user.id)
+        print("record_get: ", record_get)
+        for records in record_get:
+            tag_get = (GlobalObjects.db_session.query(Tag)
+                       .join(TagTextBox, Tag.id == TagTextBox.tag_id)
+                       .join(TextBox, TagTextBox.textBox_id == TextBox.id)
+                       .join(Record, TextBox.record_id == Record.id)
+                       .filter(TextBox.record_id == str(getattr(records, "id")))
+                       .all()
+                    )
+            
+            return_tags = []
+            for tags in tag_get:
+                return_tags.append(str(getattr(tags, "tag_name")))
+
+            response_object["item"].append({'record_id':str(getattr(records, "id")),
+                                            'record_name':str(getattr(records, "record_name")),
+                                        #   'record_date':str(getattr(records, "record_date")),
+                                        #   'record_department':str(getattr(records, "record_department")),
+                                        #   'record_attendances':str(getattr(records, "record_attendances")),
+                                        #   'record_place':str(getattr(records, "record_place")),
+                                        #   'record_attendees_name':str(getattr(records,"record_attendees_name")),
+                                        #   'record_host_name':str(getattr(records, "record_host_name")),
+                                            'tags':return_tags
+                                            })
+        # data = (
+        #     GlobalObjects.db_session.query(Record).filter(Record.project_id == post_data.get("project_id"), Record.record_trashcan==1, Record.user_id == user.id).all()
+        # )
+        # print(data)
+        # response_object["item"] = [{"Record.id": row.id, "Record.project_id": row.project_id} for row in data]
         response_object["message"] = "垃圾桶顯示成功"
     except Exception as e:
         response_object["status"] = "failed"
@@ -559,14 +596,30 @@ def tag_search():
         post_data = request.get_json()
         id = post_data.get("project_id")
         user = GlobalObjects.flask_auth.current_user()
+        time_filter_unit = post_data.get("time_filter_unit")
+        time_filter_length = post_data.get("time_filter_length")
+        time_sort = post_data.get("time_sort") if post_data.get("time_sort") else "asc"
+        time_filter = None
 
         project_exists = GlobalObjects.db_session.query(exists().where(Project.id == id)).scalar()
+
         if not project_exists:
             response_object['status'] = 'failed'
             response_object['message'] = '專案不存在'
             return jsonify(response_object), 400
 
-        date_projects = (
+        if time_filter_unit == "days":
+            timedelta_days = datetime.now - timedelta(days=time_filter_length)
+            time_filter = timedelta_days.timestamp()
+        elif time_filter_unit == "months":
+            timedelta_months = datetime.now - timedelta(months=time_filter_length)
+            time_filter = timedelta_months.timestamp()
+        elif time_filter_unit == "years":
+            timedelta_years = datetime.now - timedelta(years=time_filter_length)
+            time_filter = timedelta_years.timestamp()
+        
+
+        date_projects_query = (
             GlobalObjects.db_session.query(
                 TextBox.id.label("TextBox_id"),
                 TextBox.record_id,
@@ -589,13 +642,13 @@ def tag_search():
             .join(Tag, TagTextBox.tag_id == Tag.id)
             .filter(Project.id == id, Project.user_id == user.id)
             .filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
-            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
-            .order_by(desc(func.count(Tag.id)))
-            .all()
+            # .filter(TextBox.textBox_update_time >= time_filter)
+            # .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            # .order_by(desc(func.count(Tag.id)))
+            # .all()
         )
-        print("date_project: ", date_projects)
 
-        undate_projects = (
+        undate_projects_query = (
             GlobalObjects.db_session.query(
                 TextBox.id.label("TextBox_id"),
                 TextBox.record_id,
@@ -626,11 +679,34 @@ def tag_search():
                 ))
                 .correlate_except(TextBox)
             )
-            .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
-            .order_by(desc(func.count(Tag.id)))
-            .all()
+            # .filter(TextBox.textBox_update_time >= time_filter)
+            # .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            # .order_by(desc(func.count(Tag.id)))
+            # .all()
         )
-        print("undate_project: ",undate_projects)
+
+        if time_filter:
+            date_projects_query = date_projects_query.filter(TextBox.textBox_update_time >= time_filter)
+            undate_projects_query = undate_projects_query.filter(TextBox.textBox_update_time >= time_filter)
+
+        date_projects_query = (
+            date_projects_query.group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            .order_by(desc(func.count(Tag.id)))
+        )
+        undate_projects_query = (
+            undate_projects_query.group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
+            .order_by(desc(func.count(Tag.id)))
+        )
+        
+        if time_sort == "desc":
+            date_projects_query = date_projects_query.order_by(desc(TextBox.textBox_update_time))
+            undate_projects_query = undate_projects_query.order_by(desc(TextBox.textBox_update_time))            
+        elif time_sort == "asc":
+            date_projects_query = date_projects_query.order_by(TextBox.textBox_update_time)
+            undate_projects_query = undate_projects_query.order_by(TextBox.textBox_update_time)  
+
+        date_projects = date_projects_query.all()
+        undate_projects = undate_projects_query.all()
 
         response_object["item"] = {
             "match": [
