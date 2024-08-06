@@ -587,6 +587,51 @@ def tag_index():
         return jsonify(response_object),400
     return jsonify(response_object),400
 
+# 時間排序
+@bp.route('/time_sort', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
+def time_sort():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    try:
+        time_filter_unit = post_data.get("time_filter_unit")
+        time_filter_length = int(post_data.get("time_filter_length")) if post_data.get("time_filter_length") else None
+        time_sort = post_data.get("time_sort") if post_data.get("time_sort") else "asc"
+        items = post_data.get("items")
+        timestamp_name = post_data.get("timestamp_name")
+
+        if time_filter_unit == "days":
+            time_filter = datetime.now() - timedelta(days=time_filter_length)
+        elif time_filter_unit == "months":
+            time_filter = datetime.now() - timedelta(months=time_filter_length)
+        elif time_filter_unit == "years":
+            time_filter = datetime.now() - timedelta(years=time_filter_length)
+
+        print(time_filter)
+
+        # 使用 filter 函数过滤 items 列表
+        filtered_items = list(
+            filter(
+                lambda item: datetime.fromisoformat(item[timestamp_name]) >= time_filter,
+                items
+            )
+        )
+
+        if time_sort == "desc":
+            filtered_items = sorted(filtered_items, key=lambda x: datetime.fromisoformat(x[timestamp_name]), reverse=True)          
+        elif time_sort == "asc":
+            filtered_items = sorted(filtered_items, key=lambda x: datetime.fromisoformat(x[timestamp_name]))   
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+        print(e)
+        logging.exception('Error at %s', 'division', exc_info=e)
+        GlobalObjects.db_session.rollback()
+        return jsonify(response_object),400
+    response_object['items'] = filtered_items
+    return jsonify(response_object),400
+
 # 標籤搜尋
 @bp.route('/tag_search', methods=['POST'])
 @GlobalObjects.flask_auth.login_required()
@@ -596,10 +641,6 @@ def tag_search():
         post_data = request.get_json()
         id = post_data.get("project_id")
         user = GlobalObjects.flask_auth.current_user()
-        time_filter_unit = post_data.get("time_filter_unit")
-        time_filter_length = post_data.get("time_filter_length")
-        time_sort = post_data.get("time_sort") if post_data.get("time_sort") else "asc"
-        time_filter = None
 
         project_exists = GlobalObjects.db_session.query(exists().where(Project.id == id)).scalar()
 
@@ -608,18 +649,20 @@ def tag_search():
             response_object['message'] = '專案不存在'
             return jsonify(response_object), 400
 
-        if time_filter_unit == "days":
-            timedelta_days = datetime.now - timedelta(days=time_filter_length)
-            time_filter = timedelta_days.timestamp()
-        elif time_filter_unit == "months":
-            timedelta_months = datetime.now - timedelta(months=time_filter_length)
-            time_filter = timedelta_months.timestamp()
-        elif time_filter_unit == "years":
-            timedelta_years = datetime.now - timedelta(years=time_filter_length)
-            time_filter = timedelta_years.timestamp()
+        # 計算事項與組別標籤符合數量
+        event_and_group_tags = [tag_info["tag_name"] for tag_info in post_data.get("事項", [])] + [tag_info["tag_name"] for tag_info in post_data.get("組別", [])]
+        tag_count_subquery = (
+            GlobalObjects.db_session.query(
+                TextBox.id.label("TextBox_id"),
+                func.count(Tag.id).label("tag_count")
+            )
+            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
+            .join(Tag, TagTextBox.tag_id == Tag.id)
+            .filter(Tag.tag_name.in_(event_and_group_tags))
+            .group_by(TextBox.id)
+        ).subquery()
         
-
-        date_projects_query = (
+        textBox_query = (
             GlobalObjects.db_session.query(
                 TextBox.id.label("TextBox_id"),
                 TextBox.record_id,
@@ -632,7 +675,8 @@ def tag_search():
                         )
                     ),
                     ']'
-                ).label("Tag")
+                ).label("Tag"),
+                TextBox.textBox_update_time
             )
             .select_from(User)
             .join(Project, User.id == Project.user_id)
@@ -640,37 +684,18 @@ def tag_search():
             .join(TextBox, Record.id == TextBox.record_id)
             .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
             .join(Tag, TagTextBox.tag_id == Tag.id)
+            .outerjoin(tag_count_subquery, TextBox.id == tag_count_subquery.c.TextBox_id)
             .filter(Project.id == id, Project.user_id == user.id)
-            .filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
-            # .filter(TextBox.textBox_update_time >= time_filter)
-            # .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
-            # .order_by(desc(func.count(Tag.id)))
-            # .all()
         )
 
+        # 搜尋符合日期標籤的 TextBox
+        date_projects_query = (
+            textBox_query.filter(Tag.tag_name.in_([tag_info["tag_name"] for tag_info in post_data.get("日期", [])]))
+        )
+
+        # 搜尋不符合日期標籤的 TextBox 或顯示沒有輸入日期標籤的情況
         undate_projects_query = (
-            GlobalObjects.db_session.query(
-                TextBox.id.label("TextBox_id"),
-                TextBox.record_id,
-                TextBox.textBox_content,
-                func.concat(
-                    '[',
-                    func.group_concat(
-                        func.concat(
-                            '{"Tag_id": ', Tag.id, ', "Tag_name": "', Tag.tag_name, '", "Tag_class": "', Tag.tag_class, '"}'
-                        )
-                    ),
-                    ']'
-                ).label("Tag")
-            )
-            .select_from(User)
-            .join(Project, User.id == Project.user_id)
-            .join(Record, Project.id == Record.project_id)
-            .join(TextBox, Record.id == TextBox.record_id)
-            .join(TagTextBox, TextBox.id == TagTextBox.textBox_id)
-            .join(Tag, TagTextBox.tag_id == Tag.id)
-            .filter(Project.id == id)
-            .filter(
+            textBox_query.filter(
                 ~exists()
                 .where(and_(
                         Tag.tag_class == '日期',
@@ -679,56 +704,47 @@ def tag_search():
                 ))
                 .correlate_except(TextBox)
             )
-            # .filter(TextBox.textBox_update_time >= time_filter)
-            # .group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
-            # .order_by(desc(func.count(Tag.id)))
-            # .all()
         )
-
-        if time_filter:
-            date_projects_query = date_projects_query.filter(TextBox.textBox_update_time >= time_filter)
-            undate_projects_query = undate_projects_query.filter(TextBox.textBox_update_time >= time_filter)
 
         date_projects_query = (
             date_projects_query.group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
-            .order_by(desc(func.count(Tag.id)))
+            .order_by(desc(func.coalesce(tag_count_subquery.c.tag_count, 0)))  # 按 tag 数量降序排序
         )
         undate_projects_query = (
             undate_projects_query.group_by(TextBox.id, TextBox.record_id, TextBox.textBox_content)
-            .order_by(desc(func.count(Tag.id)))
+            .order_by(desc(func.coalesce(tag_count_subquery.c.tag_count, 0)))  # 按 tag 数量降序排序
         )
-        
-        if time_sort == "desc":
-            date_projects_query = date_projects_query.order_by(desc(TextBox.textBox_update_time))
-            undate_projects_query = undate_projects_query.order_by(desc(TextBox.textBox_update_time))            
-        elif time_sort == "asc":
-            date_projects_query = date_projects_query.order_by(TextBox.textBox_update_time)
-            undate_projects_query = undate_projects_query.order_by(TextBox.textBox_update_time)  
+
+        date_projects_query = date_projects_query.order_by(desc(TextBox.textBox_update_time))
+        undate_projects_query = undate_projects_query.order_by(desc(TextBox.textBox_update_time)) 
 
         date_projects = date_projects_query.all()
         undate_projects = undate_projects_query.all()
 
         response_object["item"] = {
-            "match": [
+            "date_match": [
                 {
                     "TextBox_id": row[0],
                     "record_id": row[1],
                     "textBox_content": row[2],
+                    "upload_time": row[4].isoformat(),
                     "Tag": json.loads(f"[{row[3]}]")
                 }
                 for row in date_projects
             ],
-            "unmatch": [
+            "date_unmatch": [
                 {
                     "TextBox_id": row[0],
                     "record_id": row[1],
                     "textBox_content": row[2],
+                    "upload_time": row[4].isoformat(),
                     "Tag": json.loads(f"[{row[3]}]")
                 }
                 for row in undate_projects
                 if row[0] not in [row[0] for row in date_projects]
             ]
         }
+        print(response_object["item"])
         response_object["message"] = "標籤回傳成功"
     except Exception as e:
         response_object["status"] = "failed"
