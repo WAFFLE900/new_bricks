@@ -5,7 +5,10 @@ from flask_app import GlobalObjects
 
 def create_app(test_mode=False):
     app = Flask(__name__)
-    CORS(app, resources={r"/*": {'origins': "*"}})
+    CORS(app, 
+        resources={r"/*": {'origins': "*"}},
+        expose_headers=["Authorization"]
+    )
 
     if test_mode:
         # Testing mode
