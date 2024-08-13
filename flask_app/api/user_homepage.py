@@ -250,7 +250,27 @@ def add_project():
     response_object["message"] = "新增{}成功".format(post_data.get("project_name"))
     return jsonify(response_object)
 
+# 修改專案名稱
+@bp.route('/edit_project_name', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
+def edit_project_name():
+    response_object = {"status": "success"}
+    try:
+        post_data = request.get_json()
+        user = GlobalObjects.flask_auth.current_user()
+        GlobalObjects.db_session.query(Project).filter(Project.user_id == user.id, Project.id==post_data.get("project_id")).update({"project_name":post_data.get("project_name")})
+        GlobalObjects.db_session.commit()
 
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = str(e)
+        print(str(e))
+        GlobalObjects.db_session.rollback()
+        logging.exception('Error at %s', 'division', exc_info=e)
+        GlobalObjects.db_session.rollback()
+        return jsonify(response_object), 404
+    response_object["message"] = "修改成{}成功".format(post_data.get("project_name"))
+    return jsonify(response_object) 
 
 @bp.route("/add_type", methods=["POST"])
 @GlobalObjects.flask_auth.login_required()
