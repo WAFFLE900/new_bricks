@@ -933,3 +933,76 @@ def delete_tag():
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),500
     return jsonify(response_object),400
+
+# 會議記錄搜尋
+@bp.route('/search_records', methods=['POST'])
+@GlobalObjects.flask_auth.login_required()
+def search_records():
+    response_object = {'status': 'success'}
+    post_data = request.get_json()
+    user = GlobalObjects.flask_auth.current_user()
+    search_term = post_data.get("search_term")
+    try:
+        record_name_get = (
+            GlobalObjects.db_session.query(
+                Record.id,
+                Record.record_name,
+                TextBox.textBox_content,
+                func.locate(search_term, Record.record_name).label("search_term_locate"),
+                Record.record_update_time
+                )
+            .join(Project, Record.project_id == Project.id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .filter(Project.user_id==user.id, Project.id == post_data.get("project_id"))
+            .filter(Record.record_name.contains(search_term))
+            .order_by(desc(Record.record_creation_time))
+            .all()
+        )
+
+        record_content_get = (
+            GlobalObjects.db_session.query(
+                Record.id,
+                Record.record_name,
+                TextBox.textBox_content,
+                func.locate(search_term, TextBox.textBox_content).label("search_term_locate"),
+                Record.record_update_time
+                )
+            .join(Project, Record.project_id == Project.id)
+            .join(TextBox, Record.id == TextBox.record_id)
+            .filter(Project.user_id==user.id, Project.id == post_data.get("project_id"))
+            .filter(TextBox.textBox_content.contains(search_term))
+            .order_by(desc(Record.record_creation_time))
+            .all()
+        )
+        print(record_name_get)
+        response_object["item"] = {
+            "record_name": [
+                {
+                    "record_id": row[0],
+                    "record_name": row[1],
+                    "textBox_content": row[2],
+                    "search_term_locate": row[3],
+                    "record_update_time": row[4],
+                }
+                for row in record_name_get
+            ],
+            "record_content": [
+                {
+                    "record_id": row[0],
+                    "record_name": row[1],
+                    "textBox_content": row[2],
+                    "search_term_locate": row[3],
+                    "record_update_time": row[4],
+                }
+                for row in record_content_get
+            ]
+        }
+
+    except Exception as e:
+        response_object["status"] = "failed"
+        response_object["message"] = "標籤尋找失敗"
+        print(str(e))
+        logging.exception('Error at %s', 'division', exc_info=e)
+        GlobalObjects.db_session.rollback()
+        return jsonify(response_object),500
+    return jsonify(response_object),400
