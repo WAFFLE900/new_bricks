@@ -469,7 +469,7 @@ def edit_info():
     user = GlobalObjects.flask_auth.current_user()
 
     try:
-        GlobalObjects.db_session.query(User).filter(User.id==user.id).update({"user_name":post_data.get("user_name"), "user_email":post_data.get("user_email")})
+        GlobalObjects.db_session.query(User).filter(User.id==user.id).update({"user_name":post_data.get("user_name")})#, "user_email":post_data.get("user_email")
         GlobalObjects.db_session.commit()
 
     except Exception as e:

@@ -480,7 +480,7 @@ def delete_texBox():
         GlobalObjects.db_session.commit()
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = "文字方塊刪除失敗"
+        response_object["message"] = str(e)
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
@@ -585,7 +585,7 @@ def tag_index():
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 # 時間排序
 @bp.route('/time_sort', methods=['POST'])
@@ -630,7 +630,7 @@ def time_sort():
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
     response_object['items'] = filtered_items
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 # 標籤搜尋
 @bp.route('/tag_search', methods=['POST'])
@@ -753,7 +753,7 @@ def tag_search():
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),400
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 # 新增標籤
 @bp.route('/add_tag', methods=['POST'])
@@ -927,12 +927,12 @@ def delete_tag():
             GlobalObjects.db_session.commit()
     except Exception as e:
         response_object["status"] = "failed"
-        response_object["message"] = "標籤尋找失敗"
+        response_object["message"] = str(e)
         print(str(e))
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),500
-    return jsonify(response_object),400
+    return jsonify(response_object),200
 
 # 會議記錄搜尋 #順便船標籤
 @bp.route('/search_records', methods=['POST'])
@@ -1047,4 +1047,4 @@ def search_records():
         logging.exception('Error at %s', 'division', exc_info=e)
         GlobalObjects.db_session.rollback()
         return jsonify(response_object),500
-    return jsonify(response_object),400
+    return jsonify(response_object),200
