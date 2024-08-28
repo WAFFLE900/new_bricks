@@ -3,21 +3,17 @@ from flask_cors import CORS
 
 from flask_app import GlobalObjects
 
-def create_app(test_mode=False):
+def create_app(test_mode=False, config_dict=None):
     app = Flask(__name__)
     CORS(app, 
         resources={r"/*": {'origins': "*"}},
         expose_headers=["Authorization"]
     )
 
+    app.config.from_pyfile("config.py")
     if test_mode:
-        # Testing mode
-        app.config.from_pyfile()
-    else:
-        # DEV mode and PROD mode
-        app.config.from_pyfile("config.py")
+        app.config.update(config_dict)
 
-    # print(GlobalObjects)
     GlobalObjects.init_global_objects(app)
     print(GlobalObjects)
 
